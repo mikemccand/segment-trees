@@ -51,13 +51,10 @@ public class TestLongRangeMultiSet extends TestCase {
       b.record(random.nextInt(100));
     }
 
-    LongRangeMultiSet tree = b.finish(true);
+    LongRangeMultiSet set = b.finish(true);
     
     for(long x = -10; x < 100; x++) {
-      int[] counts = new int[ranges.length];
-      tree.increment(counts, x);
-      assertEquals("x=" + x, Arrays.toString(count(x, ranges)),
-                   Arrays.toString(counts));
+      verify(ranges, set, x);
     }
   }
 
@@ -76,14 +73,61 @@ public class TestLongRangeMultiSet extends TestCase {
       b.record(random.nextInt(100));
     }
 
-    LongRangeMultiSet tree = b.finish(true);
+    LongRangeMultiSet set = b.finish(true);
     
     for(long x = 0; x < 100; x++) {
-      int[] counts = new int[ranges.length];
-      tree.increment(counts, x);
-      assertEquals("x=" + x, Arrays.toString(count(x, ranges)),
-                   Arrays.toString(counts));
+      verify(ranges, set, x);
     }
+  }
+
+  public void testLongMinMax() {
+    // Closed on both:
+    LongRange[] ranges = new LongRange[] {
+      new LongRange("all", Long.MIN_VALUE, true, Long.MAX_VALUE, true)};
+    LongRangeMultiSet set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    verify(ranges, set, Long.MIN_VALUE);
+    verify(ranges, set, Long.MAX_VALUE);
+    verify(ranges, set, 0);
+
+    // Open on min, closed on max:
+    ranges = new LongRange[] {
+      new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, true)};
+    set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    verify(ranges, set, Long.MIN_VALUE);
+    verify(ranges, set, Long.MAX_VALUE);
+    verify(ranges, set, 0);
+
+    // Closed on min, open on max:
+    ranges = new LongRange[] {
+      new LongRange("all", Long.MIN_VALUE, true, Long.MAX_VALUE, false)};
+    set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    verify(ranges, set, Long.MIN_VALUE);
+    verify(ranges, set, Long.MAX_VALUE);
+    verify(ranges, set, 0);
+
+    // Open on min, open on max:
+    ranges = new LongRange[] {
+      new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, false)};
+    set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    verify(ranges, set, Long.MIN_VALUE);
+    verify(ranges, set, Long.MAX_VALUE);
+    verify(ranges, set, 0);
+  }
+
+  private void verify(LongRange[] ranges, LongRangeMultiSet set, long v) {
+    int[] actual = new int[ranges.length];
+    set.increment(actual, v);
+
+    // Count slowly but hopefully correctly!
+    int[] expected = new int[ranges.length];
+    for(int i=0;i<ranges.length;i++) {
+      LongRange range = ranges[i];
+      if (range.accept(v)) {
+        expected[i]++;
+      }
+    }
+
+    assertEquals("v=" + v, Arrays.toString(expected), Arrays.toString(actual));
   }
 
   // nocommit Long.MIN/MAX_VALUE
@@ -107,12 +151,9 @@ public class TestLongRangeMultiSet extends TestCase {
       b.record(random.nextInt(200));
     }
 
-    LongRangeMultiSet tree = b.finish(true);
+    LongRangeMultiSet set = b.finish(true);
     for(long x = -10; x < 100; x++) {
-      int[] counts = new int[ranges.length];
-      tree.increment(counts, x);
-      assertEquals("x=" + x, Arrays.toString(count(x, ranges)),
-                   Arrays.toString(counts));
+      verify(ranges, set, x);
     }
   }
 
@@ -135,30 +176,20 @@ public class TestLongRangeMultiSet extends TestCase {
       b.record(random.nextInt(200));
     }
 
-    LongRangeMultiSet tree = b.finish(true);
+    LongRangeMultiSet set = b.finish(true);
     for(long x = 0; x < 200; x++) {
-      int[] counts = new int[ranges.length];
-      tree.increment(counts, x);
-      assertEquals("x=" + x, Arrays.toString(count(x, ranges)),
-                   Arrays.toString(counts));
+      verify(ranges, set, x);
     }
   }
 
-  private int[] count(long v, LongRange[] ranges) {
-    int[] counts = new int[ranges.length];
-    for(int i=0;i<counts.length;i++) {
-      LongRange range = ranges[i];
-      if (range.accept(v)) {
-        counts[i]++;
-      }
-    }
-    return counts;
+  private int atLeast(int n) {
+    return n + random.nextInt(n);
   }
 
   // nocommit overlapping and non-overlapping versions?
 
   public void testRandom() {
-    int iters = 20;
+    int iters = atLeast(20);
     for(int iter=0;iter<iters;iter++) {
       int numRange = 1+random.nextInt(9);
       LongRange[] ranges = new LongRange[numRange];
@@ -181,25 +212,19 @@ public class TestLongRangeMultiSet extends TestCase {
         }
       }
 
-      LongRangeMultiSet tree = new LongRangeMultiSet.Builder(ranges).finish(true);
+      LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
+      if (random.nextBoolean()) {
+        int numTrain = atLeast(1000);
+        for(int i=0;i<numTrain;i++) {
+          b.record(random.nextLong());
+        }
+      }
+      LongRangeMultiSet set = b.finish(random.nextBoolean());
 
       int numPoints = 200;
       for(int i=0;i<numPoints;i++) {
         long v = random.nextInt(1100) - 50;
-        int[] expected = new int[ranges.length];
-        for(int j=0;j<ranges.length;j++) {
-          if (ranges[j].accept(v)) {
-            expected[j]++;
-          }
-        }
-
-        int[] actual = new int[ranges.length];
-        tree.increment(actual, v);
-
-        if (VERBOSE) {
-          System.out.println("  v=" + v + " expected=" + Arrays.toString(expected));
-        }
-        assertTrue(Arrays.equals(expected, actual));
+        verify(ranges, set, v);
       }
     }
   }

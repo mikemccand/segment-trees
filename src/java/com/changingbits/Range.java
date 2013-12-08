@@ -17,9 +17,7 @@ package com.changingbits;
  * limitations under the License.
  */
 
-/** Base class for a single labeled range.
- *
- *  @lucene.experimental */
+/** Base class for a single labeled range. */
 public abstract class Range {
   public final String label;
 

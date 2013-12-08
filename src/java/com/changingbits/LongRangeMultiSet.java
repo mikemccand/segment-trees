@@ -40,16 +40,9 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-// nocommit test start interval incl/excl of
-// Long.MIN/MAX_VALUE works
-
 // TODO
 //   - compare perf of "just java" vs asm
 //   - asm generator should output pseudo code too
-//   - app should be able to say up front "value will never
-//     be < 0" and we statically factor that in
-//   - can we not include leaves w/ the == points, e.g. if
-//     it never makes a difference?
 //   - make the java-like code available in a .toString()?
 //     and the ranges array?
 //   - if there is an interval that no range ever covers
@@ -58,19 +51,23 @@ import org.objectweb.asm.commons.Method;
 //   - play w/ asm
 //     - instance vars in the class vs incoming array
 //     - which way to branch
-//   - blog
-//     - compare perf to RangeSet (non-overlapping)
-//     - simple java vs asm
-//     - training vs not
 //   - later
 //     - allow changing what's done when a range matches
 //       (it's hardwired to incrementing counters, now)
 
+/** This class exposes only one method, {@link #increment},
+ *  which for a given long value will increment the count by
+ *  1 for each range containing that value.
+ *
+ *  <p> Create a {@link LongRangeMultiSet.Builder},
+ *  optionally add "training data" via the {@link
+ *  Builder#record} method, and then call {@link
+ *  LongRangeMultiSet.Builder#finish} to get an instance. */
 
 public abstract class LongRangeMultiSet {
 
-  /** For a given value, increment the count by 1 for each
-   *  range that the value matches. */
+  /** For a given value, increment the count by 1 for the
+   *  index of each range that the value matches. */
   public abstract void increment(int[] counts, long v);
 
   static void indent(StringBuilder sb, int depth) {
@@ -89,6 +86,7 @@ public abstract class LongRangeMultiSet {
     }
   }
 
+  /** Holds one node of the segment tree */
   private static class Node {
     Node left;
     Node right;
@@ -159,31 +157,47 @@ public abstract class LongRangeMultiSet {
     }
   }
 
+  /** Builds a new {@link LongRangeMultiSet}. */
   public static final class Builder {
 
     private static final String COMPILED_TREE_CLASS = LongRangeMultiSet.class.getName() + "$CompiledTree";
     private static final String COMPILED_TREE_INTERNAL = COMPILED_TREE_CLASS.replace('.', '/');
     private static final Method INCREMENT_METHOD = Method.getMethod("void increment(int[], long)");
     private static final Type LONG_SEGMENT_TREE_TYPE = Type.getType(LongRangeMultiSet.class);
-    //private static final int MAX_SOURCE_LENGTH = 16384;
 
     private final List<LongRange> elementaryIntervals;
     private final LongRange[] ranges;
 
     private final long[] elementaryCounts;
 
+    /** Create a builder, accepting the full range of longs
+     * ({@code Long.MIN_VALUE} to {@code Long.MAX_VALUE}.
+     *
+     * @param ranges Ranges to match. */
     public Builder(LongRange[] ranges) {
       this(ranges, Long.MIN_VALUE, Long.MAX_VALUE);
     }
 
-    /** hardMin and hardMax specify the guaranteed range
-     *  (inclusive) of the incoming values; for example, if
-     *  you know all values are non-negative you could pass
-     *  hardMin=0 and hardMax=Long.MAX_VALUE; in some cases
-     *  this can give some speed up. */
+    /** Create this, accepting the specified min/max range of
+     *  all values.  In some cases, bounding the incoming range
+     *  can result in faster code.  After creating this,
+     *  you should optionally call {@link #record} multiple
+     *  times (once per value you expect to encounter) so
+     *  that the resulting code can be optimized for this
+     *  data set, and finally call {@link #finish}.
+     *
+     *  @param ranges Ranges to match.
+     *  @param hardMin The value passed to {@link
+     *    LongRangeMultiSet#increment} will never be less than this.
+     *  @param hardMax The value passed to {@link
+     *    LongRangeMultiSet#increment} will never be greater
+     *    than this. */
     public Builder(LongRange[] ranges, long hardMin, long hardMax) {
 
       this.ranges = ranges;
+
+      // Compute the "elementary intervals" from the
+      // incoming ranges:
 
       // Maps an endpoint to int flags; 1 = start of
       // interval, 2 = end of interval:
@@ -215,7 +229,7 @@ public abstract class LongRangeMultiSet {
 
       List<Long> endsList = new ArrayList<Long>(endsMap.keySet());
       Collections.sort(endsList);
-      System.out.println("ends=" + endsMap);
+      //System.out.println("ends=" + endsMap);
 
       elementaryIntervals = new ArrayList<LongRange>();
       int upto0 = 1;
@@ -254,18 +268,18 @@ public abstract class LongRangeMultiSet {
         //System.out.println("    ints=" + elementaryIntervals);
         upto0++;
       }
-      // nocommit
-      System.out.println("intervals: " + elementaryIntervals);
 
       elementaryCounts = new long[elementaryIntervals.size()];
+      //System.out.println("intervals: " + elementaryIntervals);
     }
 
     /** Call this many times, once per value in your
      *  "training data set"; the builder will use this to
      *  optimize the tree structure to minimize the
      *  computation required for each call to {@link
-     *  increment}. */
+     *  #increment}. */
     public void record(long v) {
+
       int size = elementaryIntervals.size();
       int lo = 0;
       int hi = size - 1;
@@ -284,7 +298,8 @@ public abstract class LongRangeMultiSet {
     }
 
     /** Recursively splits the elementaryIntervals into
-     *  tree. */
+     *  tree, balanced according to how many times each
+     *  interval was seen. */
     private Node split(int startIndex, int endIndex) {
       System.out.println("split startIndex=" + startIndex + " endIndex=" + endIndex);
       Node n = new Node();
@@ -316,28 +331,29 @@ public abstract class LongRangeMultiSet {
       return n;
     }
 
+    /** Build the {@link LongRangeMultiSet}, by calling
+     *  {@code finish(true)}. */ 
+    public LongRangeMultiSet finish() {
+      return finish(true);
+    }
+
+    /** Build the {@link LongRangeMultiSet}. 
+     *
+     *  @param useAsm If true, the tree will be compiled to
+     *  java bytecodes using the {@code asm} library; typically
+     *  this results in a faster (~3X) implementation. */
     public LongRangeMultiSet finish(boolean useAsm) {
-      // nocommit fixme
-      System.out.println("counts: " + Arrays.toString(elementaryCounts));
 
       int numLeaves = elementaryIntervals.size();
 
-      // nocommit
-      if (true) {
-        for(int i=0;i<elementaryCounts.length;i++) {
-          long sum = elementaryIntervals.get(i).maxIncl - elementaryIntervals.get(i).minIncl + 1;
-          if (sum < 0) {
-            sum = Long.MAX_VALUE;
-          }
-          // nocommit
-          sum = 10;
-          elementaryCounts[i] = sum;
+      for(int i=0;i<numLeaves;i++) {
+        if (elementaryCounts[i] == 0) {
+          // This will create a balanced binary tree, if no
+          // training data was sent:
+          elementaryCounts[i] = 1;
         }
       }
 
-      // nocommit what if data (counts) are sparse?
-      // nocommit fallback to range size if no data?  too
-      // little data?
       Node root = split(0, numLeaves);
       for(int i=0;i<ranges.length;i++) {
         root.add(i, ranges[i]);
@@ -346,7 +362,7 @@ public abstract class LongRangeMultiSet {
       System.out.println(root);
 
       StringBuilder sb = new StringBuilder();
-      build(root, 0, sb);
+      buildJavaSource(root, 0, sb);
       System.out.println("BUILD:\n" + sb);
 
       if (useAsm) {
@@ -461,7 +477,7 @@ public abstract class LongRangeMultiSet {
       }
     }
 
-    private void build(Node node, int depth, StringBuilder sb) {
+    private void buildJavaSource(Node node, int depth, StringBuilder sb) {
       indent(sb, depth);
       sb.append("// node: " + node.start + " to " + node.end + "\n");
       if (node.outputs != null) {
@@ -475,11 +491,11 @@ public abstract class LongRangeMultiSet {
         indent(sb, depth);
         if (node.left.hasOutputs) {
           sb.append("if (v <= " + node.left.end + ") {\n");
-          build(node.left, depth+1, sb);
+          buildJavaSource(node.left, depth+1, sb);
           indent(sb, depth);
           if (node.right.hasOutputs) {
             sb.append("} else {\n");
-            build(node.right, depth+1, sb);
+            buildJavaSource(node.right, depth+1, sb);
             indent(sb, depth);
             sb.append("}\n");
           } else {
@@ -487,7 +503,7 @@ public abstract class LongRangeMultiSet {
           }
         } else {
           sb.append("if (v >= " + node.right.start + ") {\n");
-          build(node.right, depth+1, sb);
+          buildJavaSource(node.right, depth+1, sb);
           indent(sb, depth);
           sb.append("}\n");
         }
@@ -495,7 +511,9 @@ public abstract class LongRangeMultiSet {
     }
   }
 
-  /** Impl that uses only java sources. */
+  /** Basic impl that uses general purpose java sources
+   *  (no asm); this is used if you pass false to {@link
+   *  Builder#finish}. */
   private static class SimpleTree extends LongRangeMultiSet {
 
     private final Node root;

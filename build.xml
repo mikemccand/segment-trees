@@ -36,6 +36,14 @@
     </javac>
   </target>
 
+  <target name="javadocs" description="create Javadocs">
+    <mkdir dir="javadoc/"/>
+    <javadoc destdir="javadoc/">
+      <classpath refid="compile.path"/>
+      <fileset dir="src/java" includes="**/*.java" />
+    </javadoc>
+  </target>
+
   <target name="test" depends="compile-tests">
     <junit printsummary="on" haltonfailure="no" showoutput="yes">
       <jvmarg value="-Dfile.encoding=UTF-8"/>
