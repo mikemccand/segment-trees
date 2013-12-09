@@ -37,6 +37,7 @@ public class TestLongRangeMultiSet extends TestCase {
   }
 
   public void testOverlappingSimple() {
+    System.out.println("\nTEST: overlapping");
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 1", 0, true, 1, false),
         new LongRange("< 2", 0, true, 2, false),
@@ -46,10 +47,12 @@ public class TestLongRangeMultiSet extends TestCase {
 
     LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
 
+    /*
     for(int i=0;i<1000;i++) {
       // nocommit
       b.record(random.nextInt(100));
     }
+    */
 
     LongRangeMultiSet set = b.finish(true);
     

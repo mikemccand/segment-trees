@@ -308,14 +308,14 @@ public abstract class LongRangeMultiSet {
       if (startIndex < endIndex-1) {
         long sum = 0;
         for(int i=startIndex;i<endIndex;i++) {
-          sum += elementaryCounts[i]/10;
+          sum += elementaryCounts[i];
         }
         long halfSum = sum / 2;
         long bestDistance = Long.MAX_VALUE;
         int bestIndex = 0;
         sum = 0;
         for(int i=startIndex;i<endIndex-1;i++) {
-          sum += elementaryCounts[i]/10;
+          sum += elementaryCounts[i];
           long distance = Math.abs(sum - halfSum);
           if (distance < bestDistance) {
             bestDistance = distance;
@@ -353,6 +353,7 @@ public abstract class LongRangeMultiSet {
           elementaryCounts[i] = 1;
         }
       }
+      System.out.println("COUNTS: " + Arrays.toString(elementaryCounts));
 
       Node root = split(0, numLeaves);
       for(int i=0;i<ranges.length;i++) {
@@ -361,9 +362,9 @@ public abstract class LongRangeMultiSet {
       root.setHasOutputs();
       System.out.println(root);
 
-      StringBuilder sb = new StringBuilder();
-      buildJavaSource(root, 0, sb);
-      System.out.println("BUILD:\n" + sb);
+      //StringBuilder sb = new StringBuilder();
+      //buildJavaSource(root, 0, sb);
+      //System.out.println("java source:\n" + sb);
 
       if (useAsm) {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
@@ -397,13 +398,8 @@ public abstract class LongRangeMultiSet {
 
         byte[] bytes = classWriter.toByteArray();
 
-        /*
-        InputStream is = new ByteArrayInputStream(bytes);
-        ClassReader cr = new ClassReader(is);
-        cr.accept(new TraceClassVisitor(new PrintWriter(System.out)), 0);
-        */
-
         // javap -c /x/tmp/my.class
+        /*
         try {
           FileOutputStream fos = new FileOutputStream(new File("/x/tmp/my.class"));
           fos.write(bytes);
@@ -411,6 +407,7 @@ public abstract class LongRangeMultiSet {
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
+        */
 
         // nocommit allow changing the class loader
         Class<? extends LongRangeMultiSet> treeClass = new Loader(LongRangeMultiSet.class.getClassLoader())

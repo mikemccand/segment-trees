@@ -25,7 +25,7 @@ import com.changingbits.LongRangeMultiSet;
 //import com.google.common.collect.ImmutableRangeSet;
 //import com.google.common.collect.Range;
 
-// ant compile; javac -cp ../build/facet/classes/java:/x/tmp/guava-15.0.jar SegmentTreePerf.java; java -cp .:../build/facet/classes/java:../build/core/classes/java:lib/asm-4.1.jar:lib/asm-commons-4.1.jar:/x/tmp/guava-15.0.jar  SegmentTreePerf
+// ant compile; javac -cp build/java src/test/com/changingbits/PerfTest.jav; java -cp build/java:src/test:lib/asm-4.1.jar:lib/asm-commons-4.1.jar  com.changingbits.PerfTest
 
 public class PerfTest {
 
@@ -39,20 +39,19 @@ public class PerfTest {
     }
 
     testSegmentTree(values);
-    testSimpleLinear(values);
+    //testSimpleLinear(values);
     //testRangeSet(values);
   }
 
   private static void testSegmentTree(int[] values) {
 
-    /*
     LongRange[] ranges = new LongRange[] {
       new LongRange("< 1", 0, true, 1, false),
       new LongRange("< 2", 0, true, 2, false),
       new LongRange("< 5", 0, true, 5, false),
       new LongRange("< 10", 0, true, 10, false)};
-    */
 
+    /*
     LongRange[] ranges = new LongRange[] {
       new LongRange("< 10", 0, true, 10, false),
       new LongRange("10 - 20", 10, true, 20, false),
@@ -62,6 +61,7 @@ public class PerfTest {
       new LongRange("50 - 60", 50, true, 60, false),
       new LongRange("60 - 70", 60, true, 70, false),
       new LongRange("70 - 80", 70, true, 80, false)};
+    */
 
     LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges, 0, 1000);
     for(int i=0;i<values.length;i++) {
@@ -70,12 +70,17 @@ public class PerfTest {
     LongRangeMultiSet tree = b.finish(true);
 
     for(int iter=0;iter<100;iter++) {
+      //LongRangeMultiSet tree = new Test1();
+      //LongRangeMultiSet tree = new Test2();
       int[] counts = new int[ranges.length];
       long t0 = System.nanoTime();
       for(int i=0;i<values.length;i++) {
         tree.increment(counts, values[i]);
       }
       long t1 = System.nanoTime();
+      if (tree instanceof Test2) {
+        ((Test2) tree).getCounts(counts);
+      }
       int sum = 0;
       for(int count : counts) {
         sum += count;
