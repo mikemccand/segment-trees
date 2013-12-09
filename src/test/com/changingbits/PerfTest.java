@@ -19,9 +19,6 @@ package com.changingbits;
 
 import java.util.Random;
 
-import com.changingbits.LongRange;
-import com.changingbits.LongRangeMultiSet;
-
 //import com.google.common.collect.ImmutableRangeSet;
 //import com.google.common.collect.Range;
 
@@ -62,28 +59,22 @@ public class PerfTest {
       new LongRange("60 - 70", 60, true, 70, false),
       new LongRange("70 - 80", 70, true, 80, false)};
 
-    LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges, 0, 1000);
+    Builder b = new Builder(ranges, 0, 1000);
     for(int i=0;i<values.length;i++) {
       b.record(values[i]);
     }
-    LongRangeMultiSet tree = b.finish(true);
+    LongRangeMultiSet set = b.getMultiSet(true);
 
     for(int iter=0;iter<100;iter++) {
       //LongRangeMultiSet tree = new Test1();
       //LongRangeMultiSet tree = new Test2();
-      int[] counts = new int[ranges.length];
+      int[] matchedRanges = new int[ranges.length];
       long t0 = System.nanoTime();
+      long sum = 0;
       for(int i=0;i<values.length;i++) {
-        tree.increment(counts, values[i]);
+        sum += set.lookup(values[i], matchedRanges);
       }
       long t1 = System.nanoTime();
-      if (tree instanceof Test2) {
-        ((Test2) tree).getCounts(counts);
-      }
-      int sum = 0;
-      for(int count : counts) {
-        sum += count;
-      }
       System.out.println("iter " + iter + ": " + (t1-t0)/1000000. + " msec; count=" + sum);
     }
   }
@@ -129,24 +120,16 @@ public class PerfTest {
       new LongRange("60 - 70", 60, true, 70, false),
       new LongRange("70 - 80", 70, true, 80, false)};
 
+    LinearLongRangeMultiSet set = new LinearLongRangeMultiSet(ranges);
+
     for(int iter=0;iter<100;iter++) {
-      //int[] counts = new int[ranges.length];
-      int[] counts = new int[ranges.length];
+      int[] matchedRanges = new int[ranges.length];
       long t0 = System.nanoTime();
+      long sum = 0;
       for(int i=0;i<values.length;i++) {
-        long v = values[i];
-        for(int j=0;j<ranges.length;j++) {
-          LongRange range = ranges[j];
-          if (range.accept(v)) {
-            counts[j]++;
-          }
-        }
+        sum += set.lookup(values[i], matchedRanges);
       }
       long t1 = System.nanoTime();
-      int sum = 0;
-      for(int count : counts) {
-        sum += count;
-      }
       System.out.println("iter " + iter + ": " + (t1-t0)/1000000. + " msec; count=" + sum);
     }
   }

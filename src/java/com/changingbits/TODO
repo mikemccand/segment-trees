@@ -1,0 +1,14 @@
+//   - test "decompilation" cost
+//   - asm generator should output pseudo code too
+//   - make the java-like code available in a .toString()?
+//     and the ranges array?
+//   - if there is an interval that no range ever covers
+//     (which would be ... really weird), then we need not
+//     cover the "full" number line?
+//   - play w/ asm
+//     - instance vars in the class vs incoming array
+//     - which way to branch
+//   - later
+//     - increment a multi-valued field
+//     - allow changing what's done when a range matches
+//       (it's hardwired to incrementing counters, now)

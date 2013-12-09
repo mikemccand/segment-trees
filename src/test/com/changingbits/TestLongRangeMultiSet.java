@@ -20,17 +20,15 @@ package com.changingbits;
 import java.util.Arrays;
 import java.util.Random;
 
-import junit.framework.TestCase;
-
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestLongRangeMultiSet {
 
   private static Random random;
-  private static boolean VERBOSE = false;
+  private static boolean VERBOSE;
 
   @BeforeClass
   public static void beforeClass() {
@@ -48,20 +46,23 @@ public class TestLongRangeMultiSet {
         new LongRange("< 10", 0, true, 10, false)
     };
 
-    LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
+    Builder b = new Builder(ranges);
 
     maybeTrain(b, 0, 200);
 
-    LongRangeMultiSet set = b.finish(true);
+    LongRangeMultiSet set = b.getMultiSet(true);
     
     for(long x = -10; x < 100; x++) {
       verify(ranges, set, x);
     }
   }
 
-  private void maybeTrain(LongRangeMultiSet.Builder b, int min, int max) {
+  private void maybeTrain(Builder b, int min, int max) {
     if (random.nextBoolean()) {
       int count = atLeast(200);
+      if (VERBOSE) {
+        System.out.println("  record " + count + " values");
+      }
       for(int i=0;i<count;i++) {
         b.record(min + random.nextInt(max-min));
       }
@@ -77,11 +78,11 @@ public class TestLongRangeMultiSet {
         new LongRange("< 10", 0, true, 10, false)
     };
 
-    LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges, 0, 100);
+    Builder b = new Builder(ranges, 0, 100);
 
     maybeTrain(b, 0, 100);
 
-    LongRangeMultiSet set = b.finish(true);
+    LongRangeMultiSet set = b.getMultiSet(true);
     
     for(long x = 0; x < 100; x++) {
       verify(ranges, set, x);
@@ -93,7 +94,7 @@ public class TestLongRangeMultiSet {
     // Closed on both:
     LongRange[] ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, true, Long.MAX_VALUE, true)};
-    LongRangeMultiSet set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    LongRangeMultiSet set = new Builder(ranges).getMultiSet(true);
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
@@ -101,7 +102,7 @@ public class TestLongRangeMultiSet {
     // Open on min, closed on max:
     ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, true)};
-    set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    set = new Builder(ranges).getMultiSet(true);
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
@@ -109,7 +110,7 @@ public class TestLongRangeMultiSet {
     // Closed on min, open on max:
     ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, true, Long.MAX_VALUE, false)};
-    set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    set = new Builder(ranges).getMultiSet(true);
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
@@ -117,26 +118,31 @@ public class TestLongRangeMultiSet {
     // Open on min, open on max:
     ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, false)};
-    set = new LongRangeMultiSet.Builder(ranges).finish(true);
+    set = new Builder(ranges).getMultiSet(true);
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
   }
 
   private void verify(LongRange[] ranges, LongRangeMultiSet set, long v) {
-    int[] actual = new int[ranges.length];
-    set.increment(actual, v);
+    int[] result = new int[ranges.length];
+    int actualCount = set.lookup(v, result);
+    int[] actual = new int[actualCount];
+    System.arraycopy(result, 0, actual, 0, actualCount);
+    Arrays.sort(actual);
 
     // Count slowly but hopefully correctly!
-    int[] expected = new int[ranges.length];
+    int expectedCount = 0;
     for(int i=0;i<ranges.length;i++) {
       LongRange range = ranges[i];
       if (range.accept(v)) {
-        expected[i]++;
+        result[expectedCount++] = i;
       }
     }
-
-    assertEquals("v=" + v, Arrays.toString(expected), Arrays.toString(actual));
+    int[] expected = new int[expectedCount];
+    System.arraycopy(result, 0, expected, 0, expectedCount);
+    assertTrue("v=" + v + " expected=" + Arrays.toString(expected) + " vs actual=" + Arrays.toString(actual),
+               Arrays.equals(expected, actual));
   }
 
   @Test
@@ -152,11 +158,11 @@ public class TestLongRangeMultiSet {
         new LongRange("70 - 80", 70, true, 80, false),
       };
 
-    LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
+    Builder b = new Builder(ranges);
 
     maybeTrain(b, 0, 200);
 
-    LongRangeMultiSet set = b.finish(true);
+    LongRangeMultiSet set = b.getMultiSet(true);
     for(long x = -10; x < 100; x++) {
       verify(ranges, set, x);
     }
@@ -175,11 +181,11 @@ public class TestLongRangeMultiSet {
         new LongRange("70 - 80", 70, true, 80, false),
       };
 
-    LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges, 0, 200);
+    Builder b = new Builder(ranges, 0, 200);
 
     maybeTrain(b, 0, 200);
 
-    LongRangeMultiSet set = b.finish(true);
+    LongRangeMultiSet set = b.getMultiSet(true);
     for(long x = 0; x < 200; x++) {
       verify(ranges, set, x);
     }
@@ -213,14 +219,17 @@ public class TestLongRangeMultiSet {
         }
       }
 
-      LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
+      Builder b = new Builder(ranges);
       maybeTrain(b, 0, 1000);
-      LongRangeMultiSet set = b.finish(random.nextBoolean());
+      boolean useAsm = random.nextBoolean();
+      if (VERBOSE) {
+        System.out.println("  useAsm=" + useAsm);
+      }
+      LongRangeMultiSet set = b.getMultiSet(useAsm);
 
       int numPoints = 200;
       for(int i=0;i<numPoints;i++) {
-        long v = random.nextInt(1100) - 50;
-        verify(ranges, set, v);
+        verify(ranges, set, random.nextInt(1100) - 50);
       }
     }
   }

@@ -17,18 +17,24 @@ package com.changingbits;
  * limitations under the License.
  */
 
-/** This class exposes only one method, {@link #increment},
- *  which for a given long value will increment the count by
- *  1 for each range containing that value.
- *
- *  <p> See {@link Builder} for creating an instance of
- *  this. */
+/** Naive O(N) impl that scans all ranges on each lookup.
+ *  This is typically slow!! */
+class LinearLongRangeMultiSet extends LongRangeMultiSet {
 
-public abstract class LongRangeMultiSet {
+  private final LongRange[] ranges;
 
-  /** For a given value, lookup the range indices that it
-   *  matches.  This places each matched range index into
-   *  matchedRanges and returns the number of matched
-   *  ranges. */
-  public abstract int lookup(long v, int[] matchedRanges);
+  public LinearLongRangeMultiSet(LongRange[] ranges) {
+    this.ranges = ranges;
+  }
+
+  @Override
+  public int lookup(long v, int[] matchedRanges) {
+    int upto = 0;
+    for(int i=0;i<ranges.length;i++) {
+      if (ranges[i].accept(v)) {
+        matchedRanges[upto++] = i;
+      }
+    }
+    return upto;
+  }
 }
