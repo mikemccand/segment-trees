@@ -18,23 +18,31 @@ package com.changingbits;
  */
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /** Holds one node of the segment tree */
 class Node {
-  Node left;
-  Node right;
+  final Node left;
+  final Node right;
 
-  // Our range:
-  long start;
-  long end;
+  // Our range, inclusive:
+  final long start;
+  final long end;
 
   // Which ranges to output when a query goes through
   // this node:
-  List<Integer> outputs;
+  int[] outputs;
 
   // True if we, or any of our descendents, have outputs:
   boolean hasOutputs;
+
+  public Node(long start, long end, Node left, Node right) {
+    this.start = start;
+    this.end = end;
+    this.left = left;
+    this.right = right;
+  }
 
   @Override
   public String toString() {
@@ -53,7 +61,7 @@ class Node {
     }
     if (outputs != null) {
       sb.append(" outputs=");
-      sb.append(outputs);
+      sb.append(Arrays.toString(outputs));
     }
     sb.append('\n');
 
@@ -62,31 +70,5 @@ class Node {
       left.toString(sb, depth+1);
       right.toString(sb, depth+1);
     }
-  }
-
-  void add(int index, LongRange range) {
-    if (start >= range.minIncl && end <= range.maxIncl) {
-      // Our range is fully included in the incoming
-      // range; add to our output list:
-      if (outputs == null) {
-        outputs = new ArrayList<Integer>();
-      }
-      outputs.add(index);
-    } else if (left != null) {
-      assert right != null;
-      // Recurse:
-      left.add(index, range);
-      right.add(index, range);
-    }
-  }
-
-  boolean setHasOutputs() {
-    hasOutputs = outputs != null;
-    if (left != null) {
-      hasOutputs |= left.setHasOutputs();
-      hasOutputs |= right.setHasOutputs();
-    }
-
-    return hasOutputs;
   }
 }

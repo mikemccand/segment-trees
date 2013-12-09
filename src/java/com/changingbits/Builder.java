@@ -195,9 +195,8 @@ public final class Builder {
    *  interval was seen. */
   private Node split(int startIndex, int endIndex) {
     //System.out.println("split startIndex=" + startIndex + " endIndex=" + endIndex);
-    Node n = new Node();
-    n.start = elementaryIntervals.get(startIndex).minIncl;
-    n.end = elementaryIntervals.get(endIndex-1).maxIncl;
+    Node left, right;
+
     if (startIndex < endIndex-1) {
       long sum = 0;
       for(int i=startIndex;i<endIndex;i++) {
@@ -217,9 +216,13 @@ public final class Builder {
       }
       //System.out.println("  bestIndex=" + bestIndex + " bestDistance=" + bestDistance + " sum=" + sum);
 
-      n.left = split(startIndex, bestIndex+1);
-      n.right = split(bestIndex+1, endIndex);
+      left = split(startIndex, bestIndex+1);
+      right = split(bestIndex+1, endIndex);
+    } else {
+      left = right = null;
     }
+
+    Node n = new Node(elementaryIntervals.get(startIndex).minIncl, elementaryIntervals.get(endIndex-1).maxIncl, left, right);
 
     return n;
   }
@@ -238,13 +241,55 @@ public final class Builder {
       }
       //System.out.println("COUNTS: " + Arrays.toString(elementaryCounts));
 
+      Map<Node,List<Integer>> byNode = new HashMap<>();
       root = split(0, numLeaves);
       for(int i=0;i<ranges.length;i++) {
-        root.add(i, ranges[i]);
+        addOutputs(root, i, ranges[i], byNode);
       }
-      root.setHasOutputs();
+      setHasOutputs(root, byNode);
+      //System.out.println("ROOT: " + root);
     }
   }
+
+  /** Recursively assigns range outputs to each node. */
+  void addOutputs(Node node, int index, LongRange range, Map<Node,List<Integer>> byNode) {
+    if (node.start >= range.minIncl && node.end <= range.maxIncl) {
+      // Our range is fully included in the incoming
+      // range; add to our output list:
+      List<Integer> nodeOutputs = byNode.get(node);
+      if (nodeOutputs == null) {
+        nodeOutputs = new ArrayList<Integer>();
+        byNode.put(node, nodeOutputs);
+      }
+      nodeOutputs.add(index);
+    } else if (node.left != null) {
+      assert node.right != null;
+      // Recurse:
+      addOutputs(node.left, index, range, byNode);
+      addOutputs(node.right, index, range, byNode);
+    }
+  }
+
+  void setHasOutputs(Node node, Map<Node,List<Integer>> byNode) {
+    List<Integer> outputs = byNode.get(node);
+    if (outputs != null) {
+      node.outputs = new int[outputs.size()];
+      for(int i=0;i<outputs.size();i++) {
+        node.outputs[i] = outputs.get(i);
+      }
+      node.hasOutputs = true;
+    } else {
+      node.hasOutputs = false;
+    }
+
+    if (node.left != null) {
+      setHasOutputs(node.left, byNode);
+      setHasOutputs(node.right, byNode);
+      node.hasOutputs |= node.left.hasOutputs;
+      node.hasOutputs |= node.right.hasOutputs;
+    }
+  }
+
 
   /** Build a {@link LongRangeMultiSet} implementation to
    *  lookup intervals for a given point.
@@ -255,10 +300,6 @@ public final class Builder {
   public LongRangeMultiSet getMultiSet(boolean useAsm) {
 
     finish();
-
-    //System.out.println(root);
-
-    // Uncomment this to see the "rough" Java code for the tree:
 
     StringBuilder sb = new StringBuilder();
     sb.append('\n');
@@ -438,5 +479,10 @@ public final class Builder {
     public Class<? extends LongRangeMultiSet> define(String className, byte[] bytecode) {
       return defineClass(className, bytecode, 0, bytecode.length).asSubclass(LongRangeMultiSet.class);
     }
+  }
+
+  public LongRangeCounter getCounter(boolean useAsm) {
+    finish();
+    return null;
   }
 }

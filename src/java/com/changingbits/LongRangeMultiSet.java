@@ -21,8 +21,8 @@ package com.changingbits;
  *  which for a given long value will increment the count by
  *  1 for each range containing that value.
  *
- *  <p> See {@link Builder} for creating an instance of
- *  this. */
+ *  <p> See {@link Builder#getMultiSet} for creating an
+ *  instance of this. */
 
 public abstract class LongRangeMultiSet {
 
