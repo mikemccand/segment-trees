@@ -49,10 +49,13 @@
     <junit printsummary="no" haltonfailure="yes" showoutput="no">
       <jvmarg value="-Dfile.encoding=UTF-8"/>
       <classpath refid="unit.test.path"/>
+      <assertions>
+	<enable package="com.changingbits"/>
+      </assertions>
 
       <formatter type="plain" usefile="no"/>
 
-      <batchtest fork="no">
+      <batchtest fork="yes">
 	<fileset dir="src/test">
 	  <include name="**/Test*.java"/>
 	</fileset>

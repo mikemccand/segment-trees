@@ -173,6 +173,7 @@ public final class Builder {
       throw new IllegalStateException("Builder is already finished");
     }
 
+    // nocommit is this working correctly :)
     int size = elementaryIntervals.size();
     int lo = 0;
     int hi = size - 1;
@@ -483,6 +484,6 @@ public final class Builder {
 
   public LongRangeCounter getCounter(boolean useAsm) {
     finish();
-    return null;
+    return new SimpleLongRangeCounter(root, elementaryIntervals, ranges.length);
   }
 }
