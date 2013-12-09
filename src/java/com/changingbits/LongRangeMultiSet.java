@@ -41,7 +41,6 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
 // TODO
-//   - compare perf of "just java" vs asm
 //   - asm generator should output pseudo code too
 //   - make the java-like code available in a .toString()?
 //     and the ranges array?
@@ -301,7 +300,7 @@ public abstract class LongRangeMultiSet {
      *  tree, balanced according to how many times each
      *  interval was seen. */
     private Node split(int startIndex, int endIndex) {
-      System.out.println("split startIndex=" + startIndex + " endIndex=" + endIndex);
+      //System.out.println("split startIndex=" + startIndex + " endIndex=" + endIndex);
       Node n = new Node();
       n.start = elementaryIntervals.get(startIndex).minIncl;
       n.end = elementaryIntervals.get(endIndex-1).maxIncl;
@@ -322,7 +321,7 @@ public abstract class LongRangeMultiSet {
             bestIndex = i;
           }
         }
-        System.out.println("  bestIndex=" + bestIndex + " bestDistance=" + bestDistance + " sum=" + sum);
+        //System.out.println("  bestIndex=" + bestIndex + " bestDistance=" + bestDistance + " sum=" + sum);
 
         n.left = split(startIndex, bestIndex+1);
         n.right = split(bestIndex+1, endIndex);
@@ -353,14 +352,16 @@ public abstract class LongRangeMultiSet {
           elementaryCounts[i] = 1;
         }
       }
-      System.out.println("COUNTS: " + Arrays.toString(elementaryCounts));
+      //System.out.println("COUNTS: " + Arrays.toString(elementaryCounts));
 
       Node root = split(0, numLeaves);
       for(int i=0;i<ranges.length;i++) {
         root.add(i, ranges[i]);
       }
       root.setHasOutputs();
-      System.out.println(root);
+      //System.out.println(root);
+
+      // Uncomment this to see the "rough" Java code for the tree:
 
       //StringBuilder sb = new StringBuilder();
       //buildJavaSource(root, 0, sb);
@@ -424,15 +425,22 @@ public abstract class LongRangeMultiSet {
     }
 
     private void buildAsm(GeneratorAdapter gen, Node node) {
+
       if (node.outputs != null) {
+        // Increment any range outputs at the current node:
         for(int range : node.outputs) {
+          // Load arg 0 (the int[] counts):
           gen.loadArg(0);
+          // The int index we will increment:
           gen.push(range);
-          gen.loadArg(0);
-          gen.push(range);
+          // Dups both 0 and range:
+          gen.dup2();
+          // Load the int value at the index:
           gen.arrayLoad(Type.INT_TYPE);
+          // Add 1:
           gen.push(1);
           gen.visitInsn(Opcodes.IADD);
+          // Store it back:
           gen.arrayStore(Type.INT_TYPE);
         }
       }

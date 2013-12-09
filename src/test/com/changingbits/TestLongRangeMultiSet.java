@@ -23,21 +23,24 @@ import java.util.Random;
 import junit.framework.TestCase;
 
 import org.junit.BeforeClass;
+import org.junit.Test;
 
-public class TestLongRangeMultiSet extends TestCase {
+import static org.junit.Assert.assertEquals;
+
+public class TestLongRangeMultiSet {
 
   private static Random random;
   private static boolean VERBOSE = false;
 
   @BeforeClass
-  public void setUp() {
+  public static void beforeClass() {
     long seed = new Random().nextLong();
-    System.out.println("seed=" + seed);
+    System.out.println("NOTE: random seed=" + seed);
     TestLongRangeMultiSet.random = new Random(seed);
   }
 
+  @Test
   public void testOverlappingSimple() {
-    System.out.println("\nTEST: overlapping");
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 1", 0, true, 1, false),
         new LongRange("< 2", 0, true, 2, false),
@@ -47,12 +50,7 @@ public class TestLongRangeMultiSet extends TestCase {
 
     LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
 
-    /*
-    for(int i=0;i<1000;i++) {
-      // nocommit
-      b.record(random.nextInt(100));
-    }
-    */
+    maybeTrain(b, 0, 200);
 
     LongRangeMultiSet set = b.finish(true);
     
@@ -61,6 +59,16 @@ public class TestLongRangeMultiSet extends TestCase {
     }
   }
 
+  private void maybeTrain(LongRangeMultiSet.Builder b, int min, int max) {
+    if (random.nextBoolean()) {
+      int count = atLeast(200);
+      for(int i=0;i<count;i++) {
+        b.record(min + random.nextInt(max-min));
+      }
+    }
+  }
+
+  @Test
   public void testOverlappingBoundedRange() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 1", 0, true, 1, false),
@@ -71,10 +79,7 @@ public class TestLongRangeMultiSet extends TestCase {
 
     LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges, 0, 100);
 
-    for(int i=0;i<1000;i++) {
-      // nocommit
-      b.record(random.nextInt(100));
-    }
+    maybeTrain(b, 0, 100);
 
     LongRangeMultiSet set = b.finish(true);
     
@@ -83,6 +88,7 @@ public class TestLongRangeMultiSet extends TestCase {
     }
   }
 
+  @Test
   public void testLongMinMax() {
     // Closed on both:
     LongRange[] ranges = new LongRange[] {
@@ -133,8 +139,7 @@ public class TestLongRangeMultiSet extends TestCase {
     assertEquals("v=" + v, Arrays.toString(expected), Arrays.toString(actual));
   }
 
-  // nocommit Long.MIN/MAX_VALUE
-
+  @Test
   public void testNonOverlappingSimple() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 10", 0, true, 10, false),
@@ -149,10 +154,7 @@ public class TestLongRangeMultiSet extends TestCase {
 
     LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
 
-    for(int i=0;i<1000;i++) {
-      // nocommit
-      b.record(random.nextInt(200));
-    }
+    maybeTrain(b, 0, 200);
 
     LongRangeMultiSet set = b.finish(true);
     for(long x = -10; x < 100; x++) {
@@ -160,6 +162,7 @@ public class TestLongRangeMultiSet extends TestCase {
     }
   }
 
+  @Test
   public void testNonOverlappingBounded() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 10", 0, true, 10, false),
@@ -174,10 +177,7 @@ public class TestLongRangeMultiSet extends TestCase {
 
     LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges, 0, 200);
 
-    for(int i=0;i<1000;i++) {
-      // nocommit
-      b.record(random.nextInt(200));
-    }
+    maybeTrain(b, 0, 200);
 
     LongRangeMultiSet set = b.finish(true);
     for(long x = 0; x < 200; x++) {
@@ -189,10 +189,9 @@ public class TestLongRangeMultiSet extends TestCase {
     return n + random.nextInt(n);
   }
 
-  // nocommit overlapping and non-overlapping versions?
-
+  @Test
   public void testRandom() {
-    int iters = atLeast(20);
+    int iters = atLeast(100);
     for(int iter=0;iter<iters;iter++) {
       int numRange = 1+random.nextInt(9);
       LongRange[] ranges = new LongRange[numRange];
@@ -201,7 +200,6 @@ public class TestLongRangeMultiSet extends TestCase {
       }
 
       for(int i=0;i<numRange;i++) {
-        // nocommit [sometimes] bigger range?
         long x = random.nextInt(1000);
         long y = random.nextInt(1000);
         if (x > y) {
@@ -216,12 +214,7 @@ public class TestLongRangeMultiSet extends TestCase {
       }
 
       LongRangeMultiSet.Builder b = new LongRangeMultiSet.Builder(ranges);
-      if (random.nextBoolean()) {
-        int numTrain = atLeast(1000);
-        for(int i=0;i<numTrain;i++) {
-          b.record(random.nextLong());
-        }
-      }
+      maybeTrain(b, 0, 1000);
       LongRangeMultiSet set = b.finish(random.nextBoolean());
 
       int numPoints = 200;
