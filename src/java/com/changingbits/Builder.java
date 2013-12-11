@@ -47,10 +47,19 @@ import org.objectweb.asm.commons.Method;
 
 public final class Builder {
 
-  private static final String COMPILED_TREE_CLASS = LongRangeMultiSet.class.getName() + "$CompiledTree";
-  private static final String COMPILED_TREE_INTERNAL = COMPILED_TREE_CLASS.replace('.', '/');
+  private static final String COMPILED_TREE_CLASS = LongRangeMultiSet.class.getName() + "$Compiled";
   private static final Method LOOKUP_METHOD = Method.getMethod("int lookup(long, int[])");
-  private static final Type LONG_SEGMENT_TREE_TYPE = Type.getType(LongRangeMultiSet.class);
+  private static final Type LONG_RANGE_MULTI_SET_TYPE = Type.getType(LongRangeMultiSet.class);
+
+  private static final String COMPILED_COUNTER_CLASS = BaseLongRangeCounter.class.getName() + "$Compiled";
+  private static final Method ADD_METHOD = Method.getMethod("void add(long)");
+  private static final Method GET_COUNTS_METHOD = Method.getMethod("int[] getCounts()");
+  private static final Type LONG_RANGE_COUNTER_TYPE = Type.getType(LongRangeCounter.class);
+  private static final Type BASE_LONG_RANGE_COUNTER_TYPE = Type.getType(BaseLongRangeCounter.class);
+  private static final Type INT_ARRAY_TYPE = Type.getType("[I");
+
+  private static final String COMPILED_COUNTER_CLASS2 = LongRangeCounter.class.getName() + "$Compiled";
+  private static final Type COMPILED_COUNTER_CLASS2_TYPE = Type.getType(COMPILED_COUNTER_CLASS2.replace('.', '/'));
 
   private final List<LongRange> elementaryIntervals;
   private final LongRange[] ranges;
@@ -194,9 +203,11 @@ public final class Builder {
   /** Recursively splits the elementaryIntervals into
    *  tree, balanced according to how many times each
    *  interval was seen. */
-  private Node split(int startIndex, int endIndex) {
+  private Node split(int startIndex, int endIndex, int[] leafUpto) {
     //System.out.println("split startIndex=" + startIndex + " endIndex=" + endIndex);
     Node left, right;
+
+    int leaf;
 
     if (startIndex < endIndex-1) {
       long sum = 0;
@@ -217,13 +228,16 @@ public final class Builder {
       }
       //System.out.println("  bestIndex=" + bestIndex + " bestDistance=" + bestDistance + " sum=" + sum);
 
-      left = split(startIndex, bestIndex+1);
-      right = split(bestIndex+1, endIndex);
+      left = split(startIndex, bestIndex+1, leafUpto);
+      right = split(bestIndex+1, endIndex, leafUpto);
+      leaf = -1;
     } else {
       left = right = null;
+      leaf = leafUpto[0];
+      leafUpto[0]++;
     }
 
-    Node n = new Node(elementaryIntervals.get(startIndex).minIncl, elementaryIntervals.get(endIndex-1).maxIncl, left, right);
+    Node n = new Node(elementaryIntervals.get(startIndex).minIncl, elementaryIntervals.get(endIndex-1).maxIncl, left, right, leaf);
 
     return n;
   }
@@ -243,7 +257,7 @@ public final class Builder {
       //System.out.println("COUNTS: " + Arrays.toString(elementaryCounts));
 
       Map<Node,List<Integer>> byNode = new HashMap<>();
-      root = split(0, numLeaves);
+      root = split(0, numLeaves, new int[1]);
       for(int i=0;i<ranges.length;i++) {
         addOutputs(root, i, ranges[i], byNode);
       }
@@ -291,6 +305,30 @@ public final class Builder {
     }
   }
 
+  private void buildRangeToLeaf(Node node, ArrayList<Integer> currentRanges, Map<Integer,List<Integer>> rangeToLeaf) {
+    if (node.outputs != null) {
+      for(int output : node.outputs) {
+        currentRanges.add(output);
+      }
+    }
+    if (node.left != null) {
+      buildRangeToLeaf(node.left, currentRanges, rangeToLeaf);
+      buildRangeToLeaf(node.right, currentRanges, rangeToLeaf);
+    } else {
+      // Leaf
+      for(int range : currentRanges) {
+        List<Integer> leaves = rangeToLeaf.get(range);
+        if (leaves == null) {
+          leaves = new ArrayList<Integer>();
+          rangeToLeaf.put(range, leaves);
+        }
+        leaves.add(node.leafIndex);
+      }
+    }
+    if (node.outputs != null) {
+      currentRanges.subList(currentRanges.size() - node.outputs.length, currentRanges.size()).clear();
+    }
+  }
 
   /** Build a {@link LongRangeMultiSet} implementation to
    *  lookup intervals for a given point.
@@ -302,26 +340,27 @@ public final class Builder {
 
     finish();
 
-    StringBuilder sb = new StringBuilder();
-    sb.append('\n');
-    int count = 0;
-    for(LongRange range : ranges) {
-      sb.append("// range ");
-      sb.append(count++);
-      sb.append(": ");
-      sb.append(range);
-      sb.append('\n');
-    }
-    sb.append("int upto = 0;\n");
-    buildJavaSource(root, 0, sb);
-    String javaSource = sb.toString();
-
     if (useAsm) {
+      StringBuilder sb = new StringBuilder();
+      sb.append('\n');
+      int count = 0;
+      for(LongRange range : ranges) {
+        sb.append("// range ");
+        sb.append(count++);
+        sb.append(": ");
+        sb.append(range);
+        sb.append('\n');
+      }
+      sb.append('\n');
+      sb.append("int upto = 0;\n");
+      buildJavaSource(root, 0, sb);
+      String javaSource = sb.toString();
+
       ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
       classWriter.visit(Opcodes.V1_7,
                         Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER | Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC,
-                        COMPILED_TREE_INTERNAL,
-                        null, LONG_SEGMENT_TREE_TYPE.getInternalName(), null);
+                        COMPILED_TREE_CLASS.replace('.', '/'),
+                        null, LONG_RANGE_MULTI_SET_TYPE.getInternalName(), null);
       classWriter.visitSource(javaSource, null);
      
       Method m = Method.getMethod("void <init> ()");
@@ -329,7 +368,7 @@ public final class Builder {
                                                           m, null, null, classWriter);
       constructor.loadThis();
       constructor.loadArgs();
-      constructor.invokeConstructor(Type.getType(LongRangeMultiSet.class), m);
+      constructor.invokeConstructor(LONG_RANGE_MULTI_SET_TYPE, m);
       constructor.returnValue();
       constructor.endMethod();
 
@@ -355,6 +394,7 @@ public final class Builder {
       byte[] bytes = classWriter.toByteArray();
 
       // javap -c /x/tmp/my.class
+      /*
       try {
         FileOutputStream fos = new FileOutputStream(new File("/x/tmp/my.class"));
         fos.write(bytes);
@@ -362,6 +402,7 @@ public final class Builder {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
+      */
 
       // nocommit allow changing the class loader
       Class<? extends LongRangeMultiSet> treeClass = new Loader(LongRangeMultiSet.class.getClassLoader())
@@ -433,6 +474,68 @@ public final class Builder {
     }
   }
 
+  /** Increments counts as field members (count0, count1,
+   *  ...) instead of a this.intArray[0], ... */
+  private void buildCounterAsm2(GeneratorAdapter gen, Node node, boolean sawOutputs) {
+
+    sawOutputs |= node.outputs != null;
+
+    if (node.left != null) {
+      assert node.left.end+1 == node.right.start;
+      // Recurse on either left or right
+      Label labelLeft = new Label();
+      Label labelEnd = new Label();
+      gen.loadArg(0);
+      gen.push(node.left.end);
+          
+      gen.ifCmp(Type.LONG_TYPE, GeneratorAdapter.LE, labelLeft);
+      buildCounterAsm2(gen, node.right, sawOutputs);
+      gen.goTo(labelEnd);
+      gen.visitLabel(labelLeft);
+      buildCounterAsm2(gen, node.left, sawOutputs);
+      gen.visitLabel(labelEnd);
+    } else if (sawOutputs) {
+      // leaf: this.countN++
+      gen.loadThis();
+      gen.loadThis();
+      gen.getField(COMPILED_COUNTER_CLASS2_TYPE, "count" + node.leafIndex, Type.INT_TYPE);
+      gen.push(1);
+      gen.visitInsn(Opcodes.IADD);
+      gen.putField(COMPILED_COUNTER_CLASS2_TYPE, "count" + node.leafIndex, Type.INT_TYPE);
+    }
+  }
+
+  private void buildCounterAsm(GeneratorAdapter gen, Node node, boolean sawOutputs) {
+
+    sawOutputs |= node.outputs != null;
+
+    if (node.left != null) {
+      assert node.left.end+1 == node.right.start;
+      // Recurse on either left or right
+      Label labelLeft = new Label();
+      Label labelEnd = new Label();
+      gen.loadArg(0);
+      gen.push(node.left.end);
+          
+      gen.ifCmp(Type.LONG_TYPE, GeneratorAdapter.LE, labelLeft);
+      buildCounterAsm(gen, node.right, sawOutputs);
+      gen.goTo(labelEnd);
+      gen.visitLabel(labelLeft);
+      buildCounterAsm(gen, node.left, sawOutputs);
+      gen.visitLabel(labelEnd);
+    } else if (sawOutputs) {
+      // leaf: elementaryCounts[node.leafIndex]++
+      gen.loadThis();
+      gen.getField(BASE_LONG_RANGE_COUNTER_TYPE, "elementaryCounts", INT_ARRAY_TYPE);
+      gen.push(node.leafIndex);
+      gen.dup2();
+      gen.arrayLoad(Type.INT_TYPE);
+      gen.push(1);
+      gen.visitInsn(Opcodes.IADD);
+      gen.arrayStore(Type.INT_TYPE);
+    }
+  }
+
   static void indent(StringBuilder sb, int depth) {
     for(int i=0;i<depth;i++) {
       sb.append("  ");
@@ -472,6 +575,261 @@ public final class Builder {
     }
   }
 
+  public LongRangeCounter getCounter(boolean useAsm) {
+    finish();
+    if (useAsm) {
+      StringBuilder sb = new StringBuilder();
+      sb.append('\n');
+      int count = 0;
+      for(LongRange range : ranges) {
+        sb.append("// range ");
+        sb.append(count++);
+        sb.append(": ");
+        sb.append(range);
+        sb.append('\n');
+      }
+      sb.append('\n');
+      buildJavaCounterSource(root, 0, sb, false);
+      String javaSource = sb.toString();
+      //System.out.println("javaSource:\n" + javaSource);
+
+      ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+      classWriter.visit(Opcodes.V1_7,
+                        Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER | Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC,
+                        COMPILED_COUNTER_CLASS.replace('.', '/'),
+                        null, BASE_LONG_RANGE_COUNTER_TYPE.getInternalName(), null);
+      classWriter.visitSource(javaSource, null);
+      Method m = Method.getMethod("void <init> (com.changingbits.Node, int, int)");
+      GeneratorAdapter constructor = new GeneratorAdapter(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                                                          m, null, null, classWriter);
+      constructor.loadThis();
+      constructor.loadArgs();
+      constructor.invokeConstructor(Type.getType(BaseLongRangeCounter.class), m);
+      constructor.returnValue();
+      constructor.endMethod();
+
+      GeneratorAdapter gen = new GeneratorAdapter(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                                                  ADD_METHOD, null, null, classWriter);
+      buildCounterAsm(gen, root, false);
+      gen.returnValue();
+      gen.endMethod();
+      classWriter.visitEnd();
+
+      byte[] bytes = classWriter.toByteArray();
+
+      // javap -c /x/tmp/my.class
+      /*
+      try {
+        FileOutputStream fos = new FileOutputStream(new File("/x/tmp/counter.class"));
+        fos.write(bytes);
+        fos.close();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      */
+
+      // nocommit allow changing the class loader
+      Class<? extends LongRangeCounter> cl = new CounterLoader(LongRangeCounter.class.getClassLoader())
+        .define(COMPILED_COUNTER_CLASS, classWriter.toByteArray());
+      try {
+        return cl.getConstructor(Node.class, int.class, int.class).newInstance(root, elementaryIntervals.size(), ranges.length);
+      } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      return new SimpleLongRangeCounter(root, elementaryIntervals, ranges.length);
+    }
+  }
+
+  private void buildJavaCounterSource(Node node, int depth, StringBuilder sb, boolean sawOutputs) {
+    indent(sb, depth);
+    sb.append("// node: " + node.start + " to " + node.end + "\n");
+
+    sawOutputs |= node.outputs != null;
+
+    if (node.left != null) {
+      indent(sb, depth);
+      sb.append("if (v <= " + node.left.end + ") {\n");
+      buildJavaCounterSource(node.left, depth+1, sb, sawOutputs);
+      indent(sb, depth);
+      sb.append("} else {\n");
+      buildJavaCounterSource(node.right, depth+1, sb, sawOutputs);
+      indent(sb, depth);
+      sb.append("}\n");
+    } else if (sawOutputs) {
+      // leaf: elementaryCounts[node.leafIndex]++
+      indent(sb, depth);
+      sb.append("elementaryCounts[");
+      sb.append(node.leafIndex);
+      sb.append("]++;\n");
+    }
+  }
+
+  private void buildJavaCounter2Source(Node node, int depth, StringBuilder sb, boolean sawOutputs) {
+    indent(sb, depth);
+    sb.append("// node: " + node.start + " to " + node.end + "\n");
+
+    sawOutputs |= node.outputs != null;
+
+    if (node.left != null) {
+      indent(sb, depth);
+      sb.append("if (v <= " + node.left.end + ") {\n");
+      buildJavaCounter2Source(node.left, depth+1, sb, sawOutputs);
+      indent(sb, depth);
+      sb.append("} else {\n");
+      buildJavaCounter2Source(node.right, depth+1, sb, sawOutputs);
+      indent(sb, depth);
+      sb.append("}\n");
+    } else if (sawOutputs) {
+      // leaf: elementaryCounts[node.leafIndex]++
+      indent(sb, depth);
+      sb.append("count");
+      sb.append(node.leafIndex);
+      sb.append("++;\n");
+    }
+  }
+
+  public LongRangeCounter getCounter2() {
+    finish();
+
+    // Maps each range to the leaf counts that contribute to it:
+    Map<Integer,List<Integer>> rangeToLeaf = new HashMap<>();
+    buildRangeToLeaf(root, new ArrayList<Integer>(), rangeToLeaf);
+
+    StringBuilder sb = new StringBuilder();
+    sb.append('\n');
+    sb.append("public void add(long v) {\n");
+    int count = 0;
+    for(LongRange range : ranges) {
+      sb.append("  // range ");
+      sb.append(count++);
+      sb.append(": ");
+      sb.append(range);
+      sb.append('\n');
+    }
+
+    buildJavaCounter2Source(root, 1, sb, false);
+
+    sb.append("}\n\n");
+    sb.append("public int[] getCounts() {\n");
+    sb.append("  int[] counts = new int[");
+    sb.append(ranges.length);
+    sb.append("];\n");
+    for(int range=0;range<ranges.length;range++) {
+      List<Integer> elements = rangeToLeaf.get(range);
+      if (elements != null) {
+        sb.append("  counts[");
+        sb.append(range);
+        sb.append("] = count");
+        sb.append(elements.get(0));
+
+        for(int i=1;i<elements.size();i++) {
+          sb.append(" + count");
+          sb.append(elements.get(i));
+        }
+        sb.append(";\n");
+      }
+    }
+    sb.append("  return counts;\n}\n");
+
+    String javaSource = sb.toString();
+    //System.out.println("counter2 javaSource:\n" + javaSource);
+
+    ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+    classWriter.visit(Opcodes.V1_7,
+                      Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER | Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC,
+                      COMPILED_COUNTER_CLASS2.replace('.', '/'),
+                      null, LONG_RANGE_COUNTER_TYPE.getInternalName(), null);
+    classWriter.visitSource(javaSource, null);
+    
+    // Define "int countN" members:
+    int numLeaves = elementaryIntervals.size();
+    for(int i=0;i<numLeaves;i++) {
+      classWriter.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC,
+                             "count" + i,
+                             "I",
+                             null,
+                             null);
+    }
+
+    // init:
+    Method m = Method.getMethod("void <init> ()");
+    GeneratorAdapter constructor = new GeneratorAdapter(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                                                        m, null, null, classWriter);
+    // Init all counters to 0:
+    for(int i=0;i<numLeaves;i++) {
+      constructor.loadThis();
+      constructor.push(0);
+      constructor.putField(COMPILED_COUNTER_CLASS2_TYPE, "count" + i, Type.INT_TYPE);
+    }
+    constructor.loadThis();
+    constructor.invokeConstructor(LONG_RANGE_COUNTER_TYPE, m);
+    constructor.returnValue();
+    constructor.endMethod();
+
+    // void add(long v):
+    GeneratorAdapter gen = new GeneratorAdapter(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                                                ADD_METHOD, null, null, classWriter);
+    buildCounterAsm2(gen, root, false);
+    gen.returnValue();
+    gen.endMethod();
+
+    // int[] getCounts():
+    gen = new GeneratorAdapter(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                               GET_COUNTS_METHOD, null, null, classWriter);
+    int countsLocal = gen.newLocal(INT_ARRAY_TYPE);
+    gen.push(ranges.length);
+    gen.newArray(Type.INT_TYPE);
+    gen.storeLocal(countsLocal);
+
+    for(int range=0;range<ranges.length;range++) {
+      List<Integer> elements = rangeToLeaf.get(range);
+      if (elements != null) {
+        gen.loadLocal(countsLocal);
+        gen.push(range);
+
+        gen.loadThis();
+        gen.getField(COMPILED_COUNTER_CLASS2_TYPE, "count" + elements.get(0), Type.INT_TYPE);
+
+        for(int i=1;i<elements.size();i++) {
+          gen.loadThis();
+          gen.getField(COMPILED_COUNTER_CLASS2_TYPE, "count" + elements.get(i), Type.INT_TYPE);
+          gen.visitInsn(Opcodes.IADD);
+        }
+
+        gen.arrayStore(Type.INT_TYPE);
+      }
+    }
+
+    gen.loadLocal(countsLocal);
+    gen.returnValue();
+    gen.endMethod();
+
+    classWriter.visitEnd();
+
+    byte[] bytes = classWriter.toByteArray();
+
+    // javap -c /x/tmp/my.class
+    /*
+    try {
+      FileOutputStream fos = new FileOutputStream(new File("/x/tmp/counter2.class"));
+      fos.write(bytes);
+      fos.close();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    */
+
+    // nocommit allow changing the class loader
+    Class<? extends LongRangeCounter> cl = new CounterLoader(LongRangeCounter.class.getClassLoader())
+      .define(COMPILED_COUNTER_CLASS2, classWriter.toByteArray());
+    try {
+      return cl.getConstructor().newInstance();
+    } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   static final class Loader extends ClassLoader {
     Loader(ClassLoader parent) {
       super(parent);
@@ -482,8 +840,13 @@ public final class Builder {
     }
   }
 
-  public LongRangeCounter getCounter(boolean useAsm) {
-    finish();
-    return new SimpleLongRangeCounter(root, elementaryIntervals, ranges.length);
+  static final class CounterLoader extends ClassLoader {
+    CounterLoader(ClassLoader parent) {
+      super(parent);
+    }
+
+    public Class<? extends LongRangeCounter> define(String className, byte[] bytecode) {
+      return defineClass(className, bytecode, 0, bytecode.length).asSubclass(LongRangeCounter.class);
+    }
   }
 }

@@ -37,7 +37,7 @@ public class TestLongRangeCounter {
     random = new Random(seed);
   }
 
-  //@Test
+  @Test
   public void testOverlappingSimple() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 1", 0, true, 1, false),
@@ -50,10 +50,10 @@ public class TestLongRangeCounter {
 
     maybeTrain(b, 0, 200);
 
-    testRandomRanges(ranges, b, -100, 300);
+    doRandomRanges(ranges, b, -100, 300);
   }
 
-  //@Test
+  @Test
   public void testOverlappingBoundedRange() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 1", 0, true, 1, false),
@@ -66,7 +66,7 @@ public class TestLongRangeCounter {
 
     maybeTrain(b, 0, 100);
 
-    testRandomRanges(ranges, b, 0, 100);
+    doRandomRanges(ranges, b, 0, 100);
   }
 
   @Test
@@ -77,7 +77,7 @@ public class TestLongRangeCounter {
 
     Builder b = new Builder(ranges);
     maybeTrain(b, -200, 200);
-    testRandomRanges(ranges, b, -200, 200);
+    doRandomRanges(ranges, b, -200, 200);
     testOneValue(ranges, b, Long.MIN_VALUE);
     testOneValue(ranges, b, Long.MAX_VALUE);
 
@@ -86,7 +86,7 @@ public class TestLongRangeCounter {
       new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, true)};
     b = new Builder(ranges);
     maybeTrain(b, -200, 200);
-    testRandomRanges(ranges, b, -200, 200);
+    doRandomRanges(ranges, b, -200, 200);
     testOneValue(ranges, b, Long.MIN_VALUE);
     testOneValue(ranges, b, Long.MAX_VALUE);
 
@@ -95,7 +95,7 @@ public class TestLongRangeCounter {
       new LongRange("all", Long.MIN_VALUE, true, Long.MAX_VALUE, false)};
     b = new Builder(ranges);
     maybeTrain(b, -200, 200);
-    testRandomRanges(ranges, b, -200, 200);
+    doRandomRanges(ranges, b, -200, 200);
     testOneValue(ranges, b, Long.MIN_VALUE);
     testOneValue(ranges, b, Long.MAX_VALUE);
 
@@ -104,7 +104,7 @@ public class TestLongRangeCounter {
       new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, false)};
     b = new Builder(ranges);
     maybeTrain(b, -200, 200);
-    testRandomRanges(ranges, b, -200, 200);
+    doRandomRanges(ranges, b, -200, 200);
     testOneValue(ranges, b, Long.MIN_VALUE);
     testOneValue(ranges, b, Long.MAX_VALUE);
   }
@@ -126,7 +126,7 @@ public class TestLongRangeCounter {
 
     maybeTrain(b, 0, 200);
 
-    testRandomRanges(ranges, b, -50, 200);
+    doRandomRanges(ranges, b, -50, 200);
   }
 
   @Test
@@ -146,8 +146,10 @@ public class TestLongRangeCounter {
 
     maybeTrain(b, 0, 200);
 
-    testRandomRanges(ranges, b, 0, 200);
+    doRandomRanges(ranges, b, 0, 200);
   }
+
+  // nocommit thread safety test
 
   @Test
   public void testRandom() {
@@ -176,19 +178,25 @@ public class TestLongRangeCounter {
       Builder b = new Builder(ranges);
       maybeTrain(b, 0, 1000);
 
-      testRandomRanges(ranges, b, 0, 1000);
+      doRandomRanges(ranges, b, 0, 1000);
     }
   }
 
-  private void testRandomRanges(LongRange[] ranges, Builder b, long min, long max) {
+  private void doRandomRanges(LongRange[] ranges, Builder b, long min, long max) {
 
-    for(int iter=0;iter<20;iter++) {
+    for(int iter=0;iter<10;iter++) {
       if (VERBOSE) {
         System.out.println("\nTEST: iter=" + iter);
       }
-      boolean useAsm = random.nextBoolean();
-      LongRangeCounter c = b.getCounter(useAsm);
+      LongRangeCounter c;
+      if (random.nextBoolean()) {
+        c = b.getCounter2();
+      } else {
+        boolean useAsm = random.nextBoolean();
+        c = b.getCounter(useAsm);
+      }
       int[] expected = new int[ranges.length];
+
       for(int i=0;i<200;i++) {
         long v = min + random.nextInt((int) (max - min));
         if (VERBOSE) {

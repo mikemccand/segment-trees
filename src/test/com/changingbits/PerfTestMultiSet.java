@@ -19,12 +19,9 @@ package com.changingbits;
 
 import java.util.Random;
 
-//import com.google.common.collect.ImmutableRangeSet;
-//import com.google.common.collect.Range;
+// ant compile; javac -cp build/java src/test/com/changingbits/PerfTestMultiSet.java; java -cp build/java:src/test:lib/asm-4.1.jar:lib/asm-commons-4.1.jar  com.changingbits.PerfTestMultiSet
 
-// ant compile; javac -cp build/java src/test/com/changingbits/PerfTest.java; java -cp build/java:src/test:lib/asm-4.1.jar:lib/asm-commons-4.1.jar  com.changingbits.PerfTest
-
-public class PerfTest {
+public class PerfTestMultiSet {
 
   public static void main(String[] args) {
     int[] values = new int[10*1000000];
@@ -35,13 +32,6 @@ public class PerfTest {
       values[i] = r.nextInt(1000);
     }
 
-    testSegmentTree(values);
-    //testSimpleLinear(values);
-    //testRangeSet(values);
-  }
-
-  private static void testSegmentTree(int[] values) {
-
     /*
     LongRange[] ranges = new LongRange[] {
       new LongRange("< 1", 0, true, 1, false),
@@ -49,6 +39,7 @@ public class PerfTest {
       new LongRange("< 5", 0, true, 5, false),
       new LongRange("< 10", 0, true, 10, false)};
     */
+
     LongRange[] ranges = new LongRange[] {
       new LongRange("< 10", 0, true, 10, false),
       new LongRange("10 - 20", 10, true, 20, false),
@@ -59,12 +50,23 @@ public class PerfTest {
       new LongRange("60 - 70", 60, true, 70, false),
       new LongRange("70 - 80", 70, true, 80, false)};
 
+    System.out.println("\nTEST: java segment tree");
+    testSegmentTree(values, ranges, false);
+    System.out.println("\nTEST: asm segment tree");
+    testSegmentTree(values, ranges, true);
+    System.out.println("\nTEST: linear search");
+    testSimpleLinear(values, ranges);
+  }
+
+  private static void testSegmentTree(int[] values, LongRange[] ranges, boolean useAsm) {
+
     Builder b = new Builder(ranges, 0, 1000);
     for(int i=0;i<values.length;i++) {
       b.record(values[i]);
     }
-    LongRangeMultiSet set = b.getMultiSet(true);
+    LongRangeMultiSet set = b.getMultiSet(useAsm);
 
+    long fastestTime = Long.MAX_VALUE;
     for(int iter=0;iter<100;iter++) {
       //LongRangeMultiSet tree = new Test1();
       //LongRangeMultiSet tree = new Test2();
@@ -74,54 +76,20 @@ public class PerfTest {
       for(int i=0;i<values.length;i++) {
         sum += set.lookup(values[i], matchedRanges);
       }
-      long t1 = System.nanoTime();
-      System.out.println("iter " + iter + ": " + (t1-t0)/1000000. + " msec; count=" + sum);
-    }
-  }
-
-  /*
-  private static void testRangeSet(int[] values) {
-    ImmutableRangeSet.Builder<Long> b = new ImmutableRangeSet.Builder<Long>();
-    b.add(Range.closedOpen(0L, 10L));
-    b.add(Range.closedOpen(10L, 20L));
-    b.add(Range.closedOpen(20L, 30L));
-    b.add(Range.closedOpen(30L, 40L));
-    b.add(Range.closedOpen(40L, 50L));
-    b.add(Range.closedOpen(50L, 60L));
-    b.add(Range.closedOpen(60L, 70L));
-    b.add(Range.closedOpen(70L, 80L));
-
-    ImmutableRangeSet<Long> s = b.build();
-    System.out.println("set=" + s);
-    for(int iter=0;iter<100;iter++) {
-      //int[] counts = new int[ranges.length];
-      long t0 = System.nanoTime();
-      int count = 0;
-      for(int i=0;i<values.length;i++) {
-        Range<Long> r = s.rangeContaining((long) values[i]);
-        if (r != null) {
-          count++;
-        }
+      long delay = System.nanoTime() - t0;
+      if (delay < fastestTime) {
+        fastestTime = delay;
+        System.out.println("  iter " + iter + ": " + (delay/1000000.) + " msec; count=" + sum);
       }
-      long t1 = System.nanoTime();
-      System.out.println("iter " + iter + ": " + (t1-t0)/1000000. + " msec; count=" + count);
     }
+    System.out.println("  best: " + (fastestTime/1000000.) + " msec");
   }
-  */
 
-  private static void testSimpleLinear(int[] values) {
-    LongRange[] ranges = new LongRange[] {
-      new LongRange("< 10", 0, true, 10, false),
-      new LongRange("10 - 20", 10, true, 20, false),
-      new LongRange("20 - 30", 20, true, 30, false),
-      new LongRange("30 - 40", 30, true, 40, false),
-      new LongRange("40 - 50", 40, true, 50, false),
-      new LongRange("50 - 60", 50, true, 60, false),
-      new LongRange("60 - 70", 60, true, 70, false),
-      new LongRange("70 - 80", 70, true, 80, false)};
+  private static void testSimpleLinear(int[] values, LongRange[] ranges) {
 
     LinearLongRangeMultiSet set = new LinearLongRangeMultiSet(ranges);
 
+    long fastestTime = Long.MAX_VALUE;
     for(int iter=0;iter<100;iter++) {
       int[] matchedRanges = new int[ranges.length];
       long t0 = System.nanoTime();
@@ -129,8 +97,12 @@ public class PerfTest {
       for(int i=0;i<values.length;i++) {
         sum += set.lookup(values[i], matchedRanges);
       }
-      long t1 = System.nanoTime();
-      System.out.println("iter " + iter + ": " + (t1-t0)/1000000. + " msec; count=" + sum);
+      long delay = System.nanoTime() - t0;
+      if (delay < fastestTime) {
+        fastestTime = delay;
+        System.out.println("  iter " + iter + ": " + (delay/1000000.) + " msec; count=" + sum);
+      }
     }
+    System.out.println("  best: " + (fastestTime/1000000.) + " msec");
   }
 }

@@ -1,3 +1,4 @@
+//   - fix stupid <= 0 then >= 0 to just be == 0
 //   - test "decompilation" cost
 //   - asm generator should output pseudo code too
 //   - make the java-like code available in a .toString()?

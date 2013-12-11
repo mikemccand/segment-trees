@@ -30,6 +30,10 @@ class Node {
   final long start;
   final long end;
 
+  // If we are a leaf, the index into elementary ranges that
+  // we point to:
+  final int leafIndex;
+
   // Which ranges to output when a query goes through
   // this node:
   int[] outputs;
@@ -37,11 +41,12 @@ class Node {
   // True if we, or any of our descendents, have outputs:
   boolean hasOutputs;
 
-  public Node(long start, long end, Node left, Node right) {
+  public Node(long start, long end, Node left, Node right, int leafIndex) {
     this.start = start;
     this.end = end;
     this.left = left;
     this.right = right;
+    this.leafIndex = leafIndex;
   }
 
   @Override
