@@ -96,6 +96,10 @@ public class PerfTestCounter {
       testCounter(values, ranges, true, true);
       System.out.println("\nTEST: asm counter, un-trained");
       testCounter(values, ranges, false, true);
+      System.out.println("\nTEST: asm counter2, trained");
+      testCounter2(values, ranges, true);
+      System.out.println("\nTEST: asm counter2, un-trained");
+      testCounter2(values, ranges, false);
     }
   }
 
@@ -124,7 +128,7 @@ public class PerfTestCounter {
     if (iter > 5 && delay < fastestTime) {
       fastestTime = delay;
       double dataPerSec = ((double) DATA_COUNT) / (fastestTime/1000000000.0);
-      System.out.println(String.format(Locale.ROOT, "  iter %d: best: %s mvals/sec", iter, nf.format(dataPerSec/1000000.0)));
+      //System.out.println(String.format(Locale.ROOT, "  iter %d: best: %s mvals/sec", iter, nf.format(dataPerSec/1000000.0)));
     }
   }
 
@@ -196,6 +200,34 @@ public class PerfTestCounter {
     start();
     for(int iter=0;iter<100;iter++) {
       LongRangeCounter counter = b.getCounter(useAsm);
+      int[] matchedRanges = new int[ranges.length];
+      iterStart();
+      for(int i=0;i<values.length;i++) {
+        counter.add(values[i]);
+      }
+      int[] counts = counter.getCounts();
+      long sum = 0;
+      for(int i=0;i<ranges.length;i++) {
+        sum += counts[i];
+      }
+      iterEnd(iter, sum);
+    }
+    end();
+  }
+
+  private static void testCounter2(int[] values, LongRange[] ranges, boolean doTrain) {
+
+    Builder b = new Builder(ranges, 0, 10000);
+    // Training w/ java impl has no effect:
+    if (doTrain) {
+      for(int i=0;i<values.length;i++) {
+        b.record(values[i]);
+      }
+    }
+
+    start();
+    for(int iter=0;iter<100;iter++) {
+      LongRangeCounter counter = b.getCounter2();
       int[] matchedRanges = new int[ranges.length];
       iterStart();
       for(int i=0;i<values.length;i++) {
