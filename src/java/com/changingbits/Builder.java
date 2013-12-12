@@ -242,9 +242,75 @@ public final class Builder {
     return n;
   }
 
+  /** Makes perfect binary tree. */
+  private Node binarySplit(int numLeaves) {
+    if (numLeaves == 1) {
+      return new Node(elementaryIntervals.get(0).minIncl,
+                      elementaryIntervals.get(0).maxIncl,
+                      null, null, 0);
+    }
+    //System.out.println("binarySplit numLeaves=" + numLeaves);
+    int levelCount = 1;
+    int level = 0;
+    while (levelCount < numLeaves) {
+      levelCount *= 2;
+      level++;
+    }
+
+    Node[] curLevel = new Node[levelCount];
+
+    // Fill in partial bottom layer first:
+    int extra = 2*numLeaves - levelCount;
+    //System.out.println("  fill first extra=" + extra);
+    for(int i=0;i<extra;i++) {
+      curLevel[i] = new Node(elementaryIntervals.get(i).minIncl,
+                             elementaryIntervals.get(i).maxIncl,
+                             null, null, i);
+    }
+
+    // Fill in next layer above, next:
+    //System.out.println("  parent count=" + (extra/2));
+    for(int i=0;i<extra/2;i++) {
+      Node left = curLevel[2*i];
+      Node right = curLevel[2*i+1];
+      curLevel[i] = new Node(left.start,
+                             right.end,
+                             left,
+                             right,
+                             -1);
+    }
+
+    int upto = extra/2;
+    //System.out.println("  extra leaf count=" + (numLeaves-extra));
+    for(int i=extra;i<numLeaves;i++) {
+      curLevel[upto++] = new Node(elementaryIntervals.get(i).minIncl,
+                                  elementaryIntervals.get(i).maxIncl,
+                                  null, null, i);
+    }
+
+    level -= 2;
+    levelCount /= 4;
+    while (level >= 0) {
+      //System.out.println("  finish cycle level=" + level + " levelCount=" + levelCount);
+      for(int i=0;i<levelCount;i++) {
+        Node left = curLevel[2*i];
+        Node right = curLevel[2*i+1];
+        curLevel[i] = new Node(left.start,
+                               right.end,
+                               left,
+                               right,
+                               -1);
+      }
+      level--;
+      levelCount /= 2;
+    }
+
+    return curLevel[0];
+  }
+
   /** Build the {@link LongRangeMultiSet}, by calling
    *  {@code finish(true)}. */ 
-  private void finish() {
+  private void finish(boolean useArrayImpl) {
     if (root == null) {
       int numLeaves = elementaryIntervals.size();
       for(int i=0;i<numLeaves;i++) {
@@ -257,12 +323,16 @@ public final class Builder {
       //System.out.println("COUNTS: " + Arrays.toString(elementaryCounts));
 
       Map<Node,List<Integer>> byNode = new HashMap<>();
-      root = split(0, numLeaves, new int[1]);
+      if (useArrayImpl) {
+        root = binarySplit(numLeaves);
+      } else {
+        root = split(0, numLeaves, new int[1]);
+      }
       for(int i=0;i<ranges.length;i++) {
         addOutputs(root, i, ranges[i], byNode);
       }
       setHasOutputs(root, byNode);
-      //System.out.println("ROOT: " + root);
+      //System.out.println("ROOT:\n" + root);
     }
   }
 
@@ -336,9 +406,9 @@ public final class Builder {
    *  @param useAsm If true, the tree will be compiled to
    *  java bytecodes using the {@code asm} library; typically
    *  this results in a faster (~3X) implementation. */
-  public LongRangeMultiSet getMultiSet(boolean useAsm) {
+  public LongRangeMultiSet getMultiSet(boolean useAsm, boolean useArrayImpl) {
 
-    finish();
+    finish(useArrayImpl);
 
     if (useAsm) {
       StringBuilder sb = new StringBuilder();
@@ -355,6 +425,7 @@ public final class Builder {
       sb.append("int upto = 0;\n");
       buildJavaSource(root, 0, sb);
       String javaSource = sb.toString();
+      //System.out.println("java: " + javaSource);
 
       ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
       classWriter.visit(Opcodes.V1_7,
@@ -413,6 +484,8 @@ public final class Builder {
         throw new RuntimeException(e);
       }
 
+    } else if (useArrayImpl) {
+      return new ArrayLongRangeMultiSet(root);
     } else {
       return new SimpleLongRangeMultiSet(root);
     }
@@ -576,7 +649,7 @@ public final class Builder {
   }
 
   public LongRangeCounter getCounter(boolean useAsm) {
-    finish();
+    finish(false);
     if (useAsm) {
       StringBuilder sb = new StringBuilder();
       sb.append('\n');
@@ -690,7 +763,7 @@ public final class Builder {
   }
 
   public LongRangeCounter getCounter2() {
-    finish();
+    finish(false);
 
     // Maps each range to the leaf counts that contribute to it:
     Map<Integer,List<Integer>> rangeToLeaf = new HashMap<>();

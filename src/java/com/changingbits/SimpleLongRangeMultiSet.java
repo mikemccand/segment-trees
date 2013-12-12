@@ -40,10 +40,9 @@ class SimpleLongRangeMultiSet extends LongRangeMultiSet {
       }
     }
     if (node.left != null) {
-      if (v >= node.left.start && v <= node.left.end) {
+      if (v <= node.left.end) {
         upto = lookup(node.left, v, matchedRanges, upto);
-      }
-      if (v >= node.right.start && v <= node.right.end) {
+      } else {
         upto = lookup(node.right, v, matchedRanges, upto);
       }
     }

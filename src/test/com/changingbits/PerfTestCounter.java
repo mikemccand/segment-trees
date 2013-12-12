@@ -27,6 +27,9 @@ import java.util.Random;
 public class PerfTestCounter {
 
   private static int DATA_COUNT = 10000000;
+  private static int RANGE_COUNT = 10;
+  private static int MAX_VALUE = 10000;
+  private static int MAX_RANGE_VALUE = 1000;
 
   public static void main(String[] args) {
     int[] values = new int[DATA_COUNT];
@@ -34,60 +37,37 @@ public class PerfTestCounter {
     Random r = new Random(seed);
 
     for(int i=0;i<values.length;i++) {
-      values[i] = r.nextInt(1000);
+      values[i] = r.nextInt(MAX_VALUE);
     }
 
-    for(int i=0;i<10;i++) {
-      LongRange[] ranges;
-      if ((i & 1) != 0) {
-        ranges = new LongRange[] {
-          new LongRange("< 5", 0, true, 5, false),
-          new LongRange("< 10", 0, true, 10, false),
-          new LongRange("< 20", 0, true, 20, false),
-          new LongRange("< 40", 0, true, 40, false),
-          new LongRange("< 100", 0, true, 100, false)};
-      } else {
-        /*
-        ranges = new LongRange[] {
-          new LongRange("< 10", 0, true, 10, false),
-          new LongRange("10 - 20", 10, true, 20, false),
-          new LongRange("20 - 30", 20, true, 30, false),
-          new LongRange("30 - 40", 30, true, 40, false),
-          new LongRange("40 - 50", 40, true, 50, false),
-          new LongRange("50 - 60", 50, true, 60, false),
-          new LongRange("60 - 70", 60, true, 70, false),
-          new LongRange("70 - 80", 70, true, 80, false)};
-        */
+    for(int iter=0;iter<10;iter++) {
 
-        ranges = new LongRange[] {
-          new LongRange("< 20", 0, true, 20, false),
-          new LongRange("20 - 40", 20, true, 40, false),
-          new LongRange("40 - 60", 40, true, 60, false),
-          new LongRange("60 - 80", 60, true, 80, false),
-          new LongRange("80 - 100", 80, true, 100, false),
-          new LongRange(">= 100", 100, true, 200, false),
-        };
-      }
+      System.out.println("\n\niter=" + iter);
 
-      /*
-      ranges = new LongRange[30];
-      for(int j=0;j<ranges.length;j++) {
-        long x = r.nextInt(1000);
-        long y = r.nextInt(1000);
-        if (x > y) {
-          long t = x;
-          x = y;
-          y = t;
+      LongRange[] ranges = new LongRange[RANGE_COUNT];
+      boolean overlap = (iter & 1) == 1;
+      double inc = ((double) MAX_RANGE_VALUE) / RANGE_COUNT;
+      for(int i=0;i<RANGE_COUNT;i++) {
+        long min;
+        if (overlap) {
+          min = 0;
+        } else {
+          min = (long) (inc * i);
         }
-        ranges[j] = new LongRange("foo", x, true, y, true);
+        ranges[i] = new LongRange("range " + i,
+                                  min,
+                                  true,
+                                  (long) (inc * (i+1)),
+                                  false);
+        System.out.println("  range " + i + ": " + ranges[i]);
       }
-      */
-      System.out.println("\n\ni=" + i + " ranges=" + Arrays.toString(ranges));
 
       System.out.println("\nTEST: java segment tree");
-      testSegmentTree(values, ranges, false);
+      testSegmentTree(values, ranges, false, false);
+      System.out.println("\nTEST: java array segment tree");
+      testSegmentTree(values, ranges, false, true);
       System.out.println("\nTEST: asm segment tree");
-      testSegmentTree(values, ranges, true);
+      testSegmentTree(values, ranges, true, false);
       System.out.println("\nTEST: linear search");
       testSimpleLinear(values, ranges);
       System.out.println("\nTEST: java counter");
@@ -104,6 +84,7 @@ public class PerfTestCounter {
   }
 
   static long t0;
+  static long iterSum;
   static long fastestTime;
   static final NumberFormat nf = NumberFormat.getInstance();
   static {
@@ -116,7 +97,7 @@ public class PerfTestCounter {
 
   private static void end() {
     double dataPerSec = ((double) DATA_COUNT) / (fastestTime/1000000000.0);
-    System.out.println(String.format(Locale.ROOT, "  best: %s mvals/sec", nf.format(dataPerSec/1000000.0)));
+    System.out.println(String.format(Locale.ROOT, "  best: %s mvals/sec, sum=%d", nf.format(dataPerSec/1000000.0), iterSum));
   }
 
   private static void iterStart() {
@@ -124,6 +105,11 @@ public class PerfTestCounter {
   }
 
   private static void iterEnd(int iter, long sum) {
+    if (iter == 0) {
+      iterSum = sum;
+    } else if (sum != iterSum) {
+      throw new RuntimeException("sum changed");
+    }
     long delay = System.nanoTime()-t0;
     if (iter > 5 && delay < fastestTime) {
       fastestTime = delay;
@@ -132,13 +118,13 @@ public class PerfTestCounter {
     }
   }
 
-  private static void testSegmentTree(int[] values, LongRange[] ranges, boolean useAsm) {
+  private static void testSegmentTree(int[] values, LongRange[] ranges, boolean useAsm, boolean useArrayImpl) {
 
     Builder b = new Builder(ranges, 0, 10000);
     for(int i=0;i<values.length;i++) {
       b.record(values[i]);
     }
-    LongRangeMultiSet set = b.getMultiSet(useAsm);
+    LongRangeMultiSet set = b.getMultiSet(useAsm, useArrayImpl);
 
     start();
     for(int iter=0;iter<100;iter++) {

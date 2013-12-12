@@ -17,92 +17,129 @@ package com.changingbits;
  * limitations under the License.
  */
 
+import java.text.NumberFormat;
+import java.util.Locale;
 import java.util.Random;
 
 // ant compile; javac -cp build/java src/test/com/changingbits/PerfTestMultiSet.java; java -cp build/java:src/test:lib/asm-4.1.jar:lib/asm-commons-4.1.jar  com.changingbits.PerfTestMultiSet
 
 public class PerfTestMultiSet {
+  private static int DATA_COUNT = 10000000;
+  private static int RANGE_COUNT = 7;
+  private static int MAX_VALUE = 1000;
+  private static int MAX_RANGE_VALUE = 1000;
+  private static boolean RANGE_OVERLAP = true;
 
   public static void main(String[] args) {
-    int[] values = new int[10*1000000];
+    int[] values = new int[DATA_COUNT];
     long seed = 17;
     Random r = new Random(seed);
 
     for(int i=0;i<values.length;i++) {
-      values[i] = r.nextInt(1000);
+      values[i] = r.nextInt(MAX_VALUE);
     }
 
-    /*
-    LongRange[] ranges = new LongRange[] {
-      new LongRange("< 1", 0, true, 1, false),
-      new LongRange("< 2", 0, true, 2, false),
-      new LongRange("< 5", 0, true, 5, false),
-      new LongRange("< 10", 0, true, 10, false)};
-    */
-
-    LongRange[] ranges = new LongRange[] {
-      new LongRange("< 10", 0, true, 10, false),
-      new LongRange("10 - 20", 10, true, 20, false),
-      new LongRange("20 - 30", 20, true, 30, false),
-      new LongRange("30 - 40", 30, true, 40, false),
-      new LongRange("40 - 50", 40, true, 50, false),
-      new LongRange("50 - 60", 50, true, 60, false),
-      new LongRange("60 - 70", 60, true, 70, false),
-      new LongRange("70 - 80", 70, true, 80, false)};
+    LongRange[] ranges = new LongRange[RANGE_COUNT];
+    double inc = ((double) MAX_RANGE_VALUE) / RANGE_COUNT;
+    for(int i=0;i<RANGE_COUNT;i++) {
+      long min;
+      if (RANGE_OVERLAP) {
+        min = 0;
+      } else {
+        min = (long) (inc * i);
+      }
+      ranges[i] = new LongRange("range " + i,
+                                min,
+                                true,
+                                (long) (inc * (i+1)),
+                                false);
+      System.out.println("range " + i + ": " + ranges[i]);
+    }
 
     System.out.println("\nTEST: java segment tree");
-    testSegmentTree(values, ranges, false);
+    testSegmentTree(values, ranges, false, false);
+    System.out.println("\nTEST: java array segment tree");
+    testSegmentTree(values, ranges, false, true);
     System.out.println("\nTEST: asm segment tree");
-    testSegmentTree(values, ranges, true);
+    testSegmentTree(values, ranges, true, false);
+    System.out.println("\nTEST: asm segment tree, perfect binary");
+    testSegmentTree(values, ranges, true, true);
     System.out.println("\nTEST: linear search");
     testSimpleLinear(values, ranges);
   }
 
-  private static void testSegmentTree(int[] values, LongRange[] ranges, boolean useAsm) {
+  static long t0;
+  static long iterSum;
+  static long fastestTime;
+  static final NumberFormat nf = NumberFormat.getInstance();
+  static {
+    nf.setMaximumFractionDigits(1);
+  }
 
-    Builder b = new Builder(ranges, 0, 1000);
+  private static void start() {
+    fastestTime = Long.MAX_VALUE;
+  }
+
+  private static void end() {
+    double dataPerSec = ((double) DATA_COUNT) / (fastestTime/1000000000.0);
+    System.out.println(String.format(Locale.ROOT, "  best: %s mvals/sec, sum=%d", nf.format(dataPerSec/1000000.0), iterSum));
+  }
+
+  private static void iterStart() {
+    t0 = System.nanoTime();
+  }
+
+  private static void iterEnd(int iter, long sum) {
+    if (iter == 0) {
+      iterSum = sum;
+    } else if (sum != iterSum) {
+      throw new RuntimeException("sum changed");
+    }
+    long delay = System.nanoTime()-t0;
+    if (iter > 5 && delay < fastestTime) {
+      fastestTime = delay;
+      double dataPerSec = ((double) DATA_COUNT) / (fastestTime/1000000000.0);
+      //System.out.println(String.format(Locale.ROOT, "  iter %d: best: %s mvals/sec", iter, nf.format(dataPerSec/1000000.0)));
+    }
+  }
+
+  private static void testSegmentTree(int[] values, LongRange[] ranges, boolean useAsm, boolean useArrayImpl) {
+
+    Builder b = new Builder(ranges, 0, Long.MAX_VALUE);
     for(int i=0;i<values.length;i++) {
       b.record(values[i]);
     }
-    LongRangeMultiSet set = b.getMultiSet(useAsm);
+    LongRangeMultiSet set = b.getMultiSet(useAsm, useArrayImpl);
 
-    long fastestTime = Long.MAX_VALUE;
+    start();
     for(int iter=0;iter<100;iter++) {
       //LongRangeMultiSet tree = new Test1();
       //LongRangeMultiSet tree = new Test2();
       int[] matchedRanges = new int[ranges.length];
-      long t0 = System.nanoTime();
+      iterStart();
       long sum = 0;
       for(int i=0;i<values.length;i++) {
         sum += set.lookup(values[i], matchedRanges);
       }
-      long delay = System.nanoTime() - t0;
-      if (delay < fastestTime) {
-        fastestTime = delay;
-        System.out.println("  iter " + iter + ": " + (delay/1000000.) + " msec; count=" + sum);
-      }
+      iterEnd(iter, sum);
     }
-    System.out.println("  best: " + (fastestTime/1000000.) + " msec");
+    end();
   }
 
   private static void testSimpleLinear(int[] values, LongRange[] ranges) {
 
     LinearLongRangeMultiSet set = new LinearLongRangeMultiSet(ranges);
 
-    long fastestTime = Long.MAX_VALUE;
+    start();
     for(int iter=0;iter<100;iter++) {
       int[] matchedRanges = new int[ranges.length];
-      long t0 = System.nanoTime();
+      iterStart();
       long sum = 0;
       for(int i=0;i<values.length;i++) {
         sum += set.lookup(values[i], matchedRanges);
       }
-      long delay = System.nanoTime() - t0;
-      if (delay < fastestTime) {
-        fastestTime = delay;
-        System.out.println("  iter " + iter + ": " + (delay/1000000.) + " msec; count=" + sum);
-      }
+      iterEnd(iter, sum);
     }
-    System.out.println("  best: " + (fastestTime/1000000.) + " msec");
+    end();
   }
 }

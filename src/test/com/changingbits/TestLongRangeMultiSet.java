@@ -50,7 +50,28 @@ public class TestLongRangeMultiSet {
 
     maybeTrain(b, 0, 200);
 
-    LongRangeMultiSet set = b.getMultiSet(true);
+    LongRangeMultiSet set = b.getMultiSet(true, random.nextBoolean());
+    
+    for(long x = -10; x < 100; x++) {
+      verify(ranges, set, x);
+    }
+  }
+
+  @Test
+  public void testBasic() {
+    LongRange[] ranges = new LongRange[] {
+        new LongRange("a", 0, true, 10, false),
+        new LongRange("b", 0, true, 20, false),
+        new LongRange("c", 10, true, 30, false),
+        new LongRange("d", 15, true, 50, false),
+        new LongRange("e", 40, true, 70, false),
+    };
+
+    Builder b = new Builder(ranges);
+
+    maybeTrain(b, 0, 200);
+
+    LongRangeMultiSet set = b.getMultiSet(true, random.nextBoolean());
     
     for(long x = -10; x < 100; x++) {
       verify(ranges, set, x);
@@ -70,7 +91,7 @@ public class TestLongRangeMultiSet {
 
     maybeTrain(b, 0, 100);
 
-    LongRangeMultiSet set = b.getMultiSet(true);
+    LongRangeMultiSet set = b.getMultiSet(true, random.nextBoolean());
     
     for(long x = 0; x < 100; x++) {
       verify(ranges, set, x);
@@ -82,7 +103,7 @@ public class TestLongRangeMultiSet {
     // Closed on both:
     LongRange[] ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, true, Long.MAX_VALUE, true)};
-    LongRangeMultiSet set = new Builder(ranges).getMultiSet(true);
+    LongRangeMultiSet set = new Builder(ranges).getMultiSet(true, random.nextBoolean());
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
@@ -90,7 +111,7 @@ public class TestLongRangeMultiSet {
     // Open on min, closed on max:
     ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, true)};
-    set = new Builder(ranges).getMultiSet(true);
+    set = new Builder(ranges).getMultiSet(true, random.nextBoolean());
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
@@ -98,7 +119,7 @@ public class TestLongRangeMultiSet {
     // Closed on min, open on max:
     ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, true, Long.MAX_VALUE, false)};
-    set = new Builder(ranges).getMultiSet(true);
+    set = new Builder(ranges).getMultiSet(true, random.nextBoolean());
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
@@ -106,7 +127,7 @@ public class TestLongRangeMultiSet {
     // Open on min, open on max:
     ranges = new LongRange[] {
       new LongRange("all", Long.MIN_VALUE, false, Long.MAX_VALUE, false)};
-    set = new Builder(ranges).getMultiSet(true);
+    set = new Builder(ranges).getMultiSet(true, random.nextBoolean());
     verify(ranges, set, Long.MIN_VALUE);
     verify(ranges, set, Long.MAX_VALUE);
     verify(ranges, set, 0);
@@ -150,7 +171,7 @@ public class TestLongRangeMultiSet {
 
     maybeTrain(b, 0, 200);
 
-    LongRangeMultiSet set = b.getMultiSet(true);
+    LongRangeMultiSet set = b.getMultiSet(true, random.nextBoolean());
     for(long x = -10; x < 100; x++) {
       verify(ranges, set, x);
     }
@@ -173,7 +194,7 @@ public class TestLongRangeMultiSet {
 
     maybeTrain(b, 0, 200);
 
-    LongRangeMultiSet set = b.getMultiSet(true);
+    LongRangeMultiSet set = b.getMultiSet(true, random.nextBoolean());
     for(long x = 0; x < 200; x++) {
       verify(ranges, set, x);
     }
@@ -209,17 +230,22 @@ public class TestLongRangeMultiSet {
       if (VERBOSE) {
         System.out.println("  useAsm=" + useAsm);
       }
-      LongRangeMultiSet set = b.getMultiSet(useAsm);
+      LongRangeMultiSet set = b.getMultiSet(useAsm, random.nextBoolean());
 
       int numPoints = 200;
       for(int i=0;i<numPoints;i++) {
-        verify(ranges, set, random.nextInt(1100) - 50);
+        long v = random.nextInt(1100) - 50;
+        if (VERBOSE) {
+          System.out.println("  verify: v=" + v);
+        }
+        verify(ranges, set, v);
       }
     }
   }
 
   private void maybeTrain(Builder b, int min, int max) {
-    if (random.nextBoolean()) {
+    // nocommit
+    if (false && random.nextBoolean()) {
       int count = atLeast(200);
       if (VERBOSE) {
         System.out.println("  record " + count + " values");
