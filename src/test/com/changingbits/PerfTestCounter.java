@@ -27,7 +27,7 @@ import java.util.Random;
 public class PerfTestCounter {
 
   private static int DATA_COUNT = 10000000;
-  private static int RANGE_COUNT = 10;
+  private static int RANGE_COUNT = 7;
   private static int MAX_VALUE = 10000;
   private static int MAX_RANGE_VALUE = 1000;
 
@@ -64,20 +64,24 @@ public class PerfTestCounter {
 
       System.out.println("\nTEST: java segment tree");
       testSegmentTree(values, ranges, false, false);
-      System.out.println("\nTEST: java array segment tree");
-      testSegmentTree(values, ranges, false, true);
+      // Always slower than java segment tree:
+      //System.out.println("\nTEST: java array segment tree");
+      //testSegmentTree(values, ranges, false, true);
       System.out.println("\nTEST: asm segment tree");
       testSegmentTree(values, ranges, true, false);
       System.out.println("\nTEST: linear search");
       testSimpleLinear(values, ranges);
       System.out.println("\nTEST: java counter");
       testCounter(values, ranges, true, false);
-      System.out.println("\nTEST: asm counter, trained");
-      testCounter(values, ranges, true, true);
-      System.out.println("\nTEST: asm counter, un-trained");
-      testCounter(values, ranges, false, true);
-      System.out.println("\nTEST: asm counter2, trained");
-      testCounter2(values, ranges, true);
+      // Often slower than un-trained
+      //System.out.println("\nTEST: asm counter, trained");
+      //testCounter(values, ranges, true, true);
+      // A bit slower than asm counter2
+      //System.out.println("\nTEST: asm counter, un-trained");
+      //testCounter(values, ranges, false, true);
+      // Often slower than un-trained
+      //System.out.println("\nTEST: asm counter2, trained");
+      //testCounter2(values, ranges, true);
       System.out.println("\nTEST: asm counter2, un-trained");
       testCounter2(values, ranges, false);
     }

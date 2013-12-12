@@ -28,7 +28,7 @@ public abstract class LongRangeMultiSet {
 
   /** For a given value, lookup the range indices that it
    *  matches.  This places each matched range index into
-   *  matchedRanges and returns the number of matched
+   *  answers and returns the number of matched
    *  ranges. */
-  public abstract int lookup(long v, int[] matchedRanges);
+  public abstract int lookup(long v, int[] answers);
 }

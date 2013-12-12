@@ -29,21 +29,21 @@ class SimpleLongRangeMultiSet extends LongRangeMultiSet {
   }
 
   @Override
-  public int lookup(long v, int[] matchedRanges) {
-    return lookup(root, v, matchedRanges, 0);
+  public int lookup(long v, int[] answers) {
+    return lookup(root, v, answers, 0);
   }
 
-  private int lookup(Node node, long v, int[] matchedRanges, int upto) {
+  private int lookup(Node node, long v, int[] answers, int upto) {
     if (node.outputs != null) {
       for(int range : node.outputs) {
-        matchedRanges[upto++] = range;
+        answers[upto++] = range;
       }
     }
     if (node.left != null) {
       if (v <= node.left.end) {
-        upto = lookup(node.left, v, matchedRanges, upto);
+        upto = lookup(node.left, v, answers, upto);
       } else {
-        upto = lookup(node.right, v, matchedRanges, upto);
+        upto = lookup(node.right, v, answers, upto);
       }
     }
 

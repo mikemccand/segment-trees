@@ -58,10 +58,13 @@ public class PerfTestMultiSet {
 
     System.out.println("\nTEST: java segment tree");
     testSegmentTree(values, ranges, false, false);
-    System.out.println("\nTEST: java array segment tree");
-    testSegmentTree(values, ranges, false, true);
-    System.out.println("\nTEST: asm segment tree");
-    testSegmentTree(values, ranges, true, false);
+    // Always slower than java segment tree:
+    //System.out.println("\nTEST: java array segment tree");
+    //testSegmentTree(values, ranges, false, true);
+    // ASM segment tree, perfect binary seems to typically
+    // be faster:
+    //System.out.println("\nTEST: asm segment tree");
+    //testSegmentTree(values, ranges, true, false);
     System.out.println("\nTEST: asm segment tree, perfect binary");
     testSegmentTree(values, ranges, true, true);
     System.out.println("\nTEST: linear search");

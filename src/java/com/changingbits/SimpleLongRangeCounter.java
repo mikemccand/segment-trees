@@ -46,7 +46,7 @@ class SimpleLongRangeCounter extends LongRangeCounter {
 
     // Binary search to find matched elementary range; we
     // are guaranteed to find a match because the last
-    // bounary is Long.MAX_VALUE (or whatever app had passed
+    // boundary is Long.MAX_VALUE (or whatever app had passed
     // as the max):
 
     int lo = 0;

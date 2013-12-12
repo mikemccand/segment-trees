@@ -497,7 +497,7 @@ public final class Builder {
       //System.out.println("gen outputs=" + node.outputs);
       // Increment any range outputs at the current node:
       for(int range : node.outputs) {
-        // Load arg 1 (the int[] matchedRanges):
+        // Load arg 1 (the int[] answers):
         gen.loadArg(1);
         // Load the index we will store to
         gen.loadLocal(uptoLocal, Type.INT_TYPE);
@@ -621,7 +621,7 @@ public final class Builder {
     if (node.outputs != null) {
       for(int range : node.outputs) {
         indent(sb, depth);
-        sb.append("matchedRanges[upto++] = " + range + ";\n");
+        sb.append("answers[upto++] = " + range + ";\n");
       }
     }
 
