@@ -41,7 +41,7 @@ public class TestLongRangeCounter {
   public void testSilly() {
   }
 
-  //@Test
+  @Test
   public void testOverlappingSimple() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 1", 0, true, 1, false),
@@ -57,7 +57,7 @@ public class TestLongRangeCounter {
     doRandomRanges(ranges, b, -100, 300);
   }
 
-  //@Test
+  @Test
   public void testOverlappingBoundedRange() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 1", 0, true, 1, false),
@@ -73,7 +73,7 @@ public class TestLongRangeCounter {
     doRandomRanges(ranges, b, 0, 100);
   }
 
-  //@Test
+  @Test
   public void testLongMinMax() {
     // Closed on both:
     LongRange[] ranges = new LongRange[] {
@@ -113,7 +113,7 @@ public class TestLongRangeCounter {
     testOneValue(ranges, b, Long.MAX_VALUE);
   }
 
-  //@Test
+  @Test
   public void testNonOverlappingSimple() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 10", 0, true, 10, false),
@@ -133,7 +133,7 @@ public class TestLongRangeCounter {
     doRandomRanges(ranges, b, -50, 200);
   }
 
-  //@Test
+  @Test
   public void testNonOverlappingBounded() {
     LongRange[] ranges = new LongRange[] {
         new LongRange("< 10", 0, true, 10, false),
@@ -155,7 +155,7 @@ public class TestLongRangeCounter {
 
   // nocommit thread safety test
 
-  //@Test
+  @Test
   public void testRandom() {
     int iters = atLeast(100);
     for(int iter=0;iter<iters;iter++) {
