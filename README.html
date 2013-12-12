@@ -1,5 +1,7 @@
 This project contains fast Java implementations of <a href="http://en.wikipedia.org/wiki/Segment_tree">segment trees</a>, which are binary tree structures to efficiently locate all ranges overlapping a given point.
 
+See <a href="http://blog.mikemccandless.com/2013/12/fast-range-faceting-using-segment-trees.html">this blog post</a> for details.
+
 Segment trees require O(log(N) + M) time for each query ("find all ranges overlapping a point"), where N is the total number of ranges and M is the number of ranges matching the current point.  After the crossover point (~10 ranges or so), segment trees are faster than a simple linear search.
 
 The code is exploratory; there are various implementations, some slow, some fast.
